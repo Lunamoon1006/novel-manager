@@ -250,7 +250,10 @@ textarea{resize:vertical}
         <span id="bc-name" style="color:var(--ink)"></span>
         <span id="bc-badge"></span>
       </div>
-      <div class="page-title" id="book-title-display"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="page-title" id="book-title-display"></div>
+        <button onclick="editBookInfo()" title="编辑书籍信息" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--ink-3);padding:2px 4px;border-radius:4px;line-height:1" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink-3)'">✎</button>
+      </div>
       <div class="page-sub" id="book-sub-display"></div>
 
       <div class="tabs">
@@ -454,9 +457,9 @@ function showModal(mode,data={}){
   modalMode=mode;
   const title=document.getElementById('modal-title'),body=document.getElementById('modal-body'),confirm=document.getElementById('modal-confirm');
   if(mode==='book'){
-    title.textContent='新增书籍';
+    title.textContent=data.id?'编辑书籍信息':'新增书籍';
     body.innerHTML=`<label>书名</label><input id="mb-n" placeholder="例：芍药媚君心" value="${data.name||''}"><label>作者笔名</label><input id="mb-a" placeholder="例：昔岁" value="${data.author||''}"><label>类型标签</label><input id="mb-g" placeholder="例：古风言情" value="${data.genre||''}">`;
-    confirm.onclick=addBook;
+    confirm.onclick=data.id?()=>saveEditBook(data.id):addBook;
   }else if(mode==='char'){
     editingCharId=data.id||null;
     title.textContent=data.id?'编辑角色':'新增角色';
@@ -490,6 +493,23 @@ function addBook(){
   const n=document.getElementById('mb-n').value.trim();if(!n){alert('请填写书名');return}
   const b={id:'bk'+Date.now(),name:n,author:document.getElementById('mb-a').value.trim(),genre:document.getElementById('mb-g').value.trim()};
   books.push(b);lsSet(BK,books);closeModal();renderSidebar();renderLib();
+}
+function editBookInfo(){
+  if(!cur)return;
+  showModal('book',{id:cur.id,name:cur.name,author:cur.author||'',genre:cur.genre||''});
+}
+function saveEditBook(bid){
+  const n=document.getElementById('mb-n').value.trim();if(!n){alert('请填写书名');return}
+  const b=books.find(x=>x.id===bid);if(!b)return;
+  b.name=n;b.author=document.getElementById('mb-a').value.trim();b.genre=document.getElementById('mb-g').value.trim();
+  lsSet(BK,books);closeModal();
+  if(cur&&cur.id===bid){
+    cur.name=b.name;cur.author=b.author;cur.genre=b.genre;
+    document.getElementById('bc-name').textContent=cur.name;
+    document.getElementById('book-title-display').textContent=cur.name;
+    document.getElementById('book-sub-display').textContent=[cur.genre,cur.author].filter(Boolean).join(' · ')||'小说';
+  }
+  renderSidebar();renderLib();
 }
 function delBook(bid){
   const b=books.find(x=>x.id===bid);if(!confirm(`确定删除「${b.name}」？`))return;
