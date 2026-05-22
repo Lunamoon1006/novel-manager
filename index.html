@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小说书库管理台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1a1410;--ink-2:#4a3f35;--ink-3:#8a7a6e;--ink-4:#c4b8ae;--paper:#faf7f2;--paper-2:#f2ede4;--paper-3:#e8e0d4;--red:#9b2335;--red-light:#f5e6e9;--gold:#b8860b;--gold-light:#fdf3d0;--green:#2d6a4f;--green-light:#e8f5ee;--border:#d4c9bc;--radius:10px;--shadow:0 2px 12px rgba(26,20,16,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}
+#api-overlay{position:fixed;inset:0;background:rgba(26,20,16,.55);display:flex;align-items:center;justify-content:center;z-index:999}
+#api-box{background:var(--paper);border-radius:14px;padding:2rem;width:min(460px,92vw);box-shadow:0 8px 40px rgba(26,20,16,.18);border:1px solid var(--border)}
+#api-box h2{font-family:'Noto Serif SC',serif;font-size:18px;font-weight:500;margin-bottom:8px}
+#api-box p{font-size:13px;color:var(--ink-2);line-height:1.7;margin-bottom:1.25rem}
+#api-box a{color:var(--red);text-decoration:none}
+#api-key-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;background:var(--paper-2);color:var(--ink);margin-bottom:8px;font-family:monospace}
+.api-notice{font-size:11px;color:var(--ink-3);margin-bottom:1rem}
+.app{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--paper-2);border-right:1px solid var(--border);padding:1.5rem 1rem;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{font-family:'Noto Serif SC',serif;font-size:16px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.logo-sub{font-size:11px;color:var(--ink-3);margin-bottom:1.5rem}
+.sb-section{font-size:10px;color:var(--ink-3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;padding-left:8px;margin-top:1rem}
+.sb-book{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--ink-2);margin-bottom:2px;display:flex;align-items:center;gap:8px;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.sb-book:hover{background:var(--paper-3);color:var(--ink)}
+.sb-book.active{background:var(--ink);color:var(--paper)}
+.sb-book .bname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-add{padding:7px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--ink-3);display:flex;align-items:center;gap:8px;border:1px dashed var(--border);background:none;width:100%;text-align:left;transition:all .15s;margin-top:4px}
+.sb-add:hover{border-color:var(--ink-3);color:var(--ink-2);background:var(--paper-3)}
+.sb-footer{margin-top:auto;padding-top:1rem}
+.sb-setting{padding:7px 10px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px;border:none;background:none;width:100%;text-align:left;transition:all .15s}
+.sb-setting:hover{background:var(--paper-3);color:var(--ink-2)}
+.main{flex:1;padding:2rem;max-width:840px}
+.page-title{font-family:'Noto Serif SC',serif;font-size:22px;font-weight:500;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--ink-3);margin-bottom:1.75rem}
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:1.5rem;overflow-x:auto}
+.tab{padding:8px 16px;font-size:13px;cursor:pointer;border:none;background:none;color:var(--ink-3);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.tab:hover{color:var(--ink-2)}
+.tab.on{color:var(--ink);border-bottom:2px solid var(--ink);font-weight:500}
+.sec{display:none}.sec.on{display:block}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.5rem}
+.stat{background:var(--paper-2);border:1px solid var(--border);border-radius:var(--radius);padding:.875rem 1rem;text-align:center}
+.stat-n{font-size:22px;font-weight:500;font-family:'Noto Serif SC',serif}
+.stat-l{font-size:11px;color:var(--ink-3);margin-top:3px}
+.ch-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.125rem;margin-bottom:8px;box-shadow:var(--shadow);transition:border-color .15s}
+.ch-card:hover{border-color:var(--ink-4)}
+.ch-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.ch-num{font-size:11px;color:var(--ink-3);background:var(--paper-2);padding:2px 8px;border-radius:4px;border:1px solid var(--border)}
+.ch-title{font-family:'Noto Serif SC',serif;font-size:15px;font-weight:500;margin-bottom:5px}
+.ch-sum{font-size:12px;color:var(--ink-2);line-height:1.7;margin-bottom:8px}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:11px;padding:2px 8px;border-radius:4px}
+.tc{background:#ede9fe;color:#4c1d95}.tf{background:var(--gold-light);color:#78350f}.tr{background:var(--green-light);color:#064e3b}
+.tag-ver{background:#e0f2fe;color:#0369a1}
+.btn{border:1px solid var(--border);background:none;padding:7px 16px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--ink-2);transition:all .15s;font-family:'Noto Sans SC',sans-serif;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--paper-2);border-color:var(--ink-4);color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn-p:hover{opacity:.85;background:var(--ink)}
+.btn-danger{color:var(--red);border-color:#f0c4c8}
+.btn-danger:hover{background:var(--red-light)}
+.btn-sm{padding:3px 10px;font-size:12px}
+.btn-gold{background:var(--gold);color:#fff;border-color:var(--gold)}
+.btn-gold:hover{opacity:.9;background:var(--gold)}
+label{font-size:12px;color:var(--ink-3);display:block;margin-bottom:4px}
+.hint{font-size:11px;color:var(--ink-4);margin-top:-6px;margin-bottom:10px;line-height:1.5}
+input,textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:'Noto Sans SC',sans-serif;color:var(--ink);background:#fff;margin-bottom:12px;transition:border .15s;line-height:1.6}
+input:focus,textarea:focus{outline:none;border-color:var(--ink-3)}
+textarea{resize:vertical}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow)}
+.ai-box{background:var(--paper-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.8;color:var(--ink-2);white-space:pre-wrap;margin-bottom:12px;min-height:50px}
+.section-label{font-size:11px;color:var(--ink-3);letter-spacing:1px;text-transform:uppercase;margin:1.25rem 0 .75rem;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.split-list{max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+.split-item{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:10px;align-items:flex-start}
+.split-item:last-child{border-bottom:none}
+.split-num{font-size:11px;color:var(--ink-3);background:var(--paper-2);padding:1px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:1px}
+.prog-wrap{margin-bottom:10px}
+.prog-bar{height:4px;background:var(--paper-3);border-radius:2px;overflow:hidden;margin:6px 0}
+.prog-fill{height:100%;background:var(--ink);border-radius:2px;transition:width .3s}
+.prog-text{font-size:11px;color:var(--ink-3)}
+.fore-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.125rem;margin-bottom:10px;box-shadow:var(--shadow)}
+.fore-card-title{font-size:12px;font-weight:500;color:var(--ink);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.fore-card-desc{font-size:11px;color:var(--ink-3);margin-bottom:8px;line-height:1.6}
+.fore-chap-tag{display:inline-block;background:var(--paper-2);border:1px solid var(--border);padding:1px 7px;border-radius:4px;margin:2px 2px 2px 0;font-size:11px}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dot-o{background:var(--gold)}.dot-c{background:var(--green)}
+.fore-item{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;gap:8px}
+.fore-item:last-child{border-bottom:none}
+.fore-item-ch{font-size:11px;color:var(--ink-3);flex-shrink:0}
+.hl{background:var(--gold-light);border-radius:2px}
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:1rem}
+.lib-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1rem;cursor:pointer;transition:all .15s;position:relative;box-shadow:var(--shadow)}
+.lib-card:hover{border-color:var(--ink-3);transform:translateY(-1px);box-shadow:0 4px 16px rgba(26,20,16,.12)}
+.lib-name{font-family:'Noto Serif SC',serif;font-size:13px;font-weight:500;margin-bottom:4px}
+.lib-meta{font-size:11px;color:var(--ink-3)}
+.lib-del{position:absolute;top:8px;right:8px;border:none;background:none;cursor:pointer;color:var(--ink-4);font-size:14px;padding:2px;line-height:1}
+.lib-del:hover{color:var(--red)}
+.lib-add{border:1px dashed var(--border);background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:120px;cursor:pointer;border-radius:var(--radius);color:var(--ink-3);font-size:13px;gap:6px;transition:all .15s;font-family:'Noto Sans SC',sans-serif}
+.lib-add:hover{border-color:var(--ink-3);color:var(--ink-2);background:var(--paper-2)}
+.peony-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;background:var(--gold-light);color:var(--gold);padding:1px 6px;border-radius:4px;margin-top:4px;border:1px solid #e8d48a}
+.modal-bg{position:fixed;inset:0;background:rgba(26,20,16,.45);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--paper);border-radius:14px;padding:1.75rem;width:min(560px,95vw);border:1px solid var(--border);box-shadow:0 8px 40px rgba(26,20,16,.18);max-height:92vh;overflow-y:auto}
+.modal h3{font-family:'Noto Serif SC',serif;font-size:16px;font-weight:500;margin-bottom:1.25rem}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--ink-3);font-size:13px;line-height:1.8}
+.breadcrumb{font-size:12px;color:var(--ink-3);margin-bottom:1.25rem;display:flex;align-items:center;gap:6px}
+.bc-link{cursor:pointer;color:var(--ink-2)}.bc-link:hover{color:var(--ink);text-decoration:underline}
+
+/* ── 版本控制 ── */
+.ver-list{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.ver-item{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;background:#fff}
+.ver-item:last-child{border-bottom:none}
+.ver-item.current-ver{background:var(--gold-light);border-left:3px solid var(--gold)}
+.ver-label{font-weight:500;color:var(--ink)}
+.ver-time{font-size:11px;color:var(--ink-3);margin-top:2px}
+.ver-actions{display:flex;gap:5px;flex-shrink:0}
+
+/* ── Diff 差异对比 ── */
+.diff-wrap{background:#fff;border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:13px;line-height:2;white-space:pre-wrap;word-break:break-all;max-height:500px;overflow-y:auto}
+.diff-add{background:#dcfce7;color:#166534;border-radius:2px;padding:0 1px}
+.diff-del{background:#fee2e2;color:#991b1b;text-decoration:line-through;border-radius:2px;padding:0 1px;opacity:.8}
+.diff-legend{display:flex;gap:12px;margin-bottom:10px;font-size:12px}
+.diff-legend-item{display:flex;align-items:center;gap:5px}
+
+/* ── 角色人设 ── */
+.char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:1rem}
+.char-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.125rem;box-shadow:var(--shadow);cursor:pointer;transition:all .15s;position:relative}
+.char-card:hover{border-color:var(--ink-3);transform:translateY(-1px)}
+.char-card.main-char{border-left:3px solid var(--gold)}
+.char-avatar{width:44px;height:44px;border-radius:50%;background:var(--paper-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:10px}
+.char-name{font-family:'Noto Serif SC',serif;font-size:15px;font-weight:500;margin-bottom:3px}
+.char-role{font-size:11px;color:var(--ink-3);margin-bottom:8px}
+.char-desc{font-size:12px;color:var(--ink-2);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.char-del{position:absolute;top:8px;right:8px;border:none;background:none;cursor:pointer;color:var(--ink-4);font-size:13px;padding:2px}
+.char-del:hover{color:var(--red)}
+.char-add{border:1px dashed var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:140px;cursor:pointer;border-radius:var(--radius);color:var(--ink-3);font-size:13px;gap:5px;transition:all .15s;background:none}
+.char-add:hover{border-color:var(--ink-3);color:var(--ink-2);background:var(--paper-2)}
+.char-avatar-lg{width:60px;height:60px;border-radius:50%;background:var(--paper-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+
+/* ── 书籍简介 ── */
+.intro-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px;box-shadow:var(--shadow);position:relative;transition:all .15s}
+.intro-card.active-intro{border-left:3px solid var(--gold)}
+.intro-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.intro-ver{font-size:13px;font-weight:500;color:var(--ink)}
+.badge-active{font-size:10px;background:var(--gold-light);color:var(--gold);padding:2px 7px;border-radius:4px;border:1px solid #e8d48a}
+.badge-draft{font-size:10px;background:var(--paper-2);color:var(--ink-3);padding:2px 7px;border-radius:4px;border:1px solid var(--border)}
+.intro-body{font-size:13px;color:var(--ink-2);line-height:1.9;white-space:pre-wrap;margin-bottom:10px}
+.intro-meta{font-size:11px;color:var(--ink-3);margin-bottom:8px}
+.intro-add{border:1px dashed var(--border);background:none;width:100%;padding:14px;border-radius:var(--radius);color:var(--ink-3);font-size:13px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Noto Sans SC',sans-serif}
+.intro-add:hover{border-color:var(--ink-3);color:var(--ink-2);background:var(--paper-2)}
+
+/* 版本选择弹窗 */
+.save-choice{background:#fff;border-radius:12px;padding:1.5rem;width:min(380px,92vw);border:1px solid var(--border);box-shadow:0 8px 40px rgba(26,20,16,.18)}
+.save-choice h4{font-family:'Noto Serif SC',serif;font-size:15px;font-weight:500;margin-bottom:8px}
+.save-choice p{font-size:12px;color:var(--ink-3);margin-bottom:1.25rem;line-height:1.6}
+.choice-btns{display:flex;flex-direction:column;gap:8px}
+.choice-btn{padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;text-align:left;font-family:'Noto Sans SC',sans-serif;font-size:13px;color:var(--ink-2);transition:all .15s}
+.choice-btn:hover{background:var(--paper-2);border-color:var(--ink-3);color:var(--ink)}
+.choice-btn strong{display:block;color:var(--ink);margin-bottom:2px}
+.choice-btn span{font-size:11px;color:var(--ink-3)}
+
+@media(max-width:640px){.sidebar{display:none}.main{padding:1rem}.form-row{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<div id="api-overlay">
+  <div id="api-box">
+    <h2>🔑 设置 Anthropic API Key</h2>
+    <p>使用 AI 分析功能需要 API Key，仅储存于本机浏览器，不会上传至任何服务器。</p>
+    <p>前往 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 取得你的 API Key。</p>
+    <input type="password" id="api-key-input" placeholder="sk-ant-api03-…">
+    <p class="api-notice">⚠️ 仅供个人自用，请勿将含有 Key 的档案公开分享</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="skipApiKey()">稍后设置</button>
+      <button class="btn btn-p" onclick="saveApiKey()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 保存选择弹窗 -->
+<div id="save-choice-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,20,16,.45);display:none;align-items:center;justify-content:center;z-index:200">
+  <div class="save-choice">
+    <h4>此章节已有记录</h4>
+    <p>检测到内容有变动，请选择保存方式：</p>
+    <div class="choice-btns">
+      <button class="choice-btn" onclick="doSaveCh('new')">
+        <strong>📋 保存为新版本</strong>
+        <span>原版本保留在版本历史，可随时对比差异</span>
+      </button>
+      <button class="choice-btn" onclick="doSaveCh('overwrite')">
+        <strong>✏️ 覆盖当前版本</strong>
+        <span>直接更新，不保留旧版本</span>
+      </button>
+      <button class="choice-btn" onclick="hideSaveChoice()" style="border-color:transparent;color:var(--ink-3)">
+        <strong>取消</strong>
+      </button>
+    </div>
+    <div style="margin-top:12px" id="new-ver-label-wrap">
+      <label>新版本名称（可选）</label>
+      <input id="new-ver-label" placeholder="例：第二稿、修改版" style="margin-bottom:0">
+    </div>
+  </div>
+</div>
+
+<!-- 差异对比弹窗 -->
+<div id="diff-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,20,16,.45);align-items:center;justify-content:center;z-index:200">
+  <div style="background:var(--paper);border-radius:14px;padding:1.75rem;width:min(720px,96vw);border:1px solid var(--border);box-shadow:0 8px 40px rgba(26,20,16,.18);max-height:90vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <h3 style="font-family:'Noto Serif SC',serif;font-size:16px;font-weight:500" id="diff-title">版本差异对比</h3>
+      <button class="btn btn-sm" onclick="hideDiff()">关闭</button>
+    </div>
+    <div class="diff-legend">
+      <div class="diff-legend-item"><span style="background:#dcfce7;border-radius:3px;padding:1px 6px;font-size:12px">新增内容</span></div>
+      <div class="diff-legend-item"><span style="background:#fee2e2;text-decoration:line-through;border-radius:3px;padding:1px 6px;font-size:12px">删除内容</span></div>
+      <div class="diff-legend-item"><span style="font-size:12px;color:var(--ink-3)">无背景 = 相同内容</span></div>
+    </div>
+    <div class="diff-wrap" id="diff-content" style="flex:1;overflow-y:auto"></div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="logo">📚 书库</div>
+    <div class="logo-sub">小说章节管理台</div>
+    <div class="sb-section">书籍</div>
+    <div id="sb-books"></div>
+    <button class="sb-add" onclick="showModal('book')">＋ 新增书籍</button>
+    <div class="sb-footer">
+      <button class="sb-setting" onclick="exportData()">📤 汇出数据备份</button>
+      <button class="sb-setting" onclick="document.getElementById('import-input').click()">📥 汇入数据</button>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="sb-setting" onclick="showApiSetting()">⚙️ API Key 设置</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="view-lib">
+      <div class="page-title">书库总览</div>
+      <div class="page-sub">点击书籍进入管理，或新增书籍</div>
+      <div class="lib-grid" id="lib-grid"></div>
+    </div>
+
+    <div id="view-book" style="display:none">
+      <div class="breadcrumb">
+        <span class="bc-link" onclick="goLib()">📚 书库</span>
+        <span>›</span>
+        <span id="bc-name" style="color:var(--ink)"></span>
+        <span id="bc-badge"></span>
+      </div>
+      <div class="page-title" id="book-title-display"></div>
+      <div class="page-sub" id="book-sub-display"></div>
+
+      <div class="tabs">
+        <button class="tab on"  onclick="sbt('ov')">总览</button>
+        <button class="tab" onclick="sbt('add')">新增章节</button>
+        <button class="tab" onclick="sbt('split')">AI 拆章</button>
+        <button class="tab" onclick="sbt('search')">搜索</button>
+        <button class="tab" onclick="sbt('fore')">伏笔追踪</button>
+        <button class="tab" onclick="sbt('chars')">角色人设</button>
+        <button class="tab" onclick="sbt('intro')">书籍简介</button>
+      </div>
+
+      <div id="bt-ov" class="sec on">
+        <div class="stats">
+          <div class="stat"><div class="stat-n" id="s0">0</div><div class="stat-l">总章节</div></div>
+          <div class="stat"><div class="stat-n" id="s1" style="color:var(--gold)">0</div><div class="stat-l">未收伏笔</div></div>
+          <div class="stat"><div class="stat-n" id="s2" style="color:var(--green)">0</div><div class="stat-l">已收伏笔</div></div>
+        </div>
+        <div id="ch-list"></div>
+      </div>
+
+      <div id="bt-add" class="sec">
+        <div class="form-card">
+          <div class="form-row">
+            <div><label>章节号</label><input id="fn" type="number" placeholder="98" min="1"></div>
+            <div><label>章节标题（四字）</label><input id="ft" placeholder="烬余残香" maxlength="10"></div>
+          </div>
+          <label>贴入正文内容</label>
+          <p class="hint">贴入后点「AI 分析」，自动填写摘要与六条主线伏笔；保存时若已有记录，会询问是否存为新版本</p>
+          <textarea id="fc" rows="7" placeholder="贴入本章正文…"></textarea>
+          <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+            <button class="btn btn-gold" onclick="doAI()" id="ai-btn">✦ AI 分析</button>
+            <button class="btn" onclick="clearAiBox()">清除结果</button>
+          </div>
+          <div id="ai-box" class="ai-box" style="display:none"></div>
+          <div class="section-label">章节资料</div>
+          <label>剧情摘要</label>
+          <textarea id="fs" rows="3" placeholder="AI 填入后可修改…"></textarea>
+          <label>出场人物（逗号分隔）</label>
+          <input id="fch" placeholder="宁梓韵, 禾凛, 亘安">
+          <div class="section-label">伏笔记录</div>
+          <label>本章伏笔</label>
+          <p class="hint">AI 根据六条主线自动识别，可修改补充</p>
+          <input id="ff" placeholder="AI 填入后可修改…">
+          <label>本章收回的伏笔</label>
+          <input id="fres" placeholder="AI 填入后可修改…">
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-p" onclick="initSaveCh()" style="flex:1">保存章节</button>
+            <button class="btn" onclick="clearForm()">清空</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="bt-split" class="sec">
+        <div class="form-card" style="margin-bottom:12px">
+          <p style="font-size:13px;color:var(--ink-2);margin-bottom:1rem;line-height:1.8">将全文档内容贴入，自动识别「第X章」拆分预览，再批量 AI 摘要后一键导入。</p>
+          <label>贴入全文内容</label>
+          <textarea id="sp-in" rows="10" placeholder="贴入整部小说或多个章节的全文内容…"></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-p" onclick="doSplit()">✦ 智能识别拆章</button>
+            <button class="btn" onclick="clearSplit()">清除</button>
+          </div>
+        </div>
+        <div id="sp-result" style="display:none">
+          <div class="form-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+              <div style="font-size:14px;font-weight:500">识别到 <span id="sp-cnt" style="color:var(--red)">0</span> 章</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-sm btn-gold" onclick="aiAllSum()" id="aa-btn">✦ 批量 AI 摘要</button>
+                <button class="btn btn-sm btn-p" onclick="impAll()">↓ 全部导入</button>
+              </div>
+            </div>
+            <div id="sp-prog" class="prog-wrap" style="display:none">
+              <div class="prog-bar"><div class="prog-fill" id="pf" style="width:0%"></div></div>
+              <div class="prog-text" id="pt">准备中…</div>
+            </div>
+            <div class="split-list" id="sp-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="bt-search" class="sec">
+        <input id="sq" placeholder="搜索人物名、情节关键词、伏笔内容…" oninput="doSearch()" style="margin-bottom:1rem">
+        <div id="s-res"></div>
+      </div>
+
+      <div id="bt-fore" class="sec"><div id="fore-content"></div></div>
+
+      <div id="bt-chars" class="sec">
+        <div id="chars-detail" style="display:none"></div>
+        <div id="chars-list-view">
+          <div class="char-grid" id="char-grid"></div>
+        </div>
+      </div>
+
+      <div id="bt-intro" class="sec">
+        <p style="font-size:13px;color:var(--ink-2);margin-bottom:1rem">保留所有简介草稿，可标记「使用中」版本，随时切换对比</p>
+        <div id="intro-list"></div>
+        <button class="intro-add" onclick="showModal('intro')">＋ 新增简介版本</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal" style="display:none">
+  <div class="modal-bg" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3 id="modal-title">新增</h3>
+      <div id="modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">取消</button>
+        <button class="btn btn-p" id="modal-confirm">确认</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BK='novel_bk_v6',CK=b=>`novel_ch_${b}_v6`,CHK=b=>`novel_char_${b}_v6`,IK=b=>`novel_intro_${b}_v6`;
+const PID='book_peony',API_KEY_STORE='novel_api_key';
+
+const LINES=[
+  {id:'leg',n:'禾凛腿伤真相',d:'金针震碎、强行站立——真实腿况与身体秘密'},
+  {id:'gu',n:'情蛊与白发',d:'体内情蛊进展、白发触发条件与压制方式'},
+  {id:'zhu',n:'祝家灭门真相',d:'二十年前大火幕后黑手尚未完全揭晓'},
+  {id:'ma',n:'祝心华生死之谜',d:'棺材是空的——母亲可能尚在人世，下落成谜'},
+  {id:'gs',n:'亘安同心草执念',d:'子母连心草追踪女主情感，亘安偏执图谋'},
+  {id:'rb',n:'三人重生身份互隐',d:'女主怀疑亘安重生；禾凛是否重生未知；三人互相不知对方秘密'}
+];
+
+const PEONY_CHARS=[
+  {id:'char_nzy',name:'宁梓韵',role:'女主角',icon:'🦊',isMain:true,
+   appearance:'狐狸眼，清冷绝俗，素颜胜雪，三千青丝。情蛊发作时鬓角泛白，白发自太阳穴蔓延。',
+   personality:'外冷内热，谨慎多思，重情重义，有仇必报。前世受尽委屈，重生后更加清醒决绝，不再轻易示弱。',
+   background:'祝家灵主后人，四岁祝家灭门后流亡大周。被生父宁伯远接回大周京城养于内宅。前世是大周皇后，被亘安冷落三年后香消玉殒。重生后借助禾凛逃离大周，以昭阳郡主身份在大秦重新活过。',
+   ability:'祝家灵主血脉，天生对香料异常敏感，能调配影响心脉的奇香；体内被种下情蛊，动情时白发显现。',
+   relations:'禾凛（男主，保护者/爱人）、亘安（前任皇帝，执念未解）、祝心华（母亲，生死成谜）、宁伯远（生父，大周礼部尚书，抛弃母女）',
+   notes:'重生后最大的秘密：她知道自己重生，怀疑亘安也重生，但不确定禾凛'},
+  {id:'char_hl',name:'禾凛',role:'男主角',icon:'🐉',isMain:true,
+   appearance:'玄色暗龙纹长衫，俊逸如玉，褐色深眸，常以轮椅示人（伪装）。平时散漫，用兵时如霜。',
+   personality:'表面温润如水，实则杀伐果断。在宁梓韵面前近乎卑微，对外是令人胆寒的帝王手段。有病态洁癖，极度在意宁梓韵对他的看法。',
+   background:'大秦太子，二十岁时被兄弟陷害落入枯井，腿骨被铁钩刺穿冻残，被先皇送往大周为质七年。回秦后以摄政王身份隐忍布局，最终称帝。是否重生目前未明。',
+   ability:'武功极高，以伪残废之身掌控大秦暗卫与死士；持家族印章可调动千军。金针震碎强行站立后经脉受损，每步都在透支寿元。',
+   relations:'宁梓韵（心上人，愿以命相护）、阿元（心腹暗卫统领）、康腾（护卫统领）、何太后（政敌）',
+   notes:'腿伤真相是全书最大伏笔之一——能走路却始终坐轮椅，背后原因尚未完全揭晓'},
+  {id:'char_ha',name:'亘安',role:'男配 / 执念反派',icon:'👑',isMain:true,
+   appearance:'玄色儒衫，剑眉星目，深邃凤眸，长发束冠，气质阴鸷却不失贵气。',
+   personality:'表面深情，实则偏执。曾真心悔过，但手段残忍不悔。重生后疯狂执念无法释怀，目的不纯。',
+   background:'大周皇帝，曾冷落宁梓韵三年宠爱淑妃。是否重生女主怀疑但尚未确认。持有同心草母株，可感知宁梓韵体内情蛊动向，追踪其情感流向。',
+   ability:'帝王权术，武功不弱；持同心草母株可感知宁梓韵情感动向。',
+   relations:'宁梓韵（执念，无法放手）、李思然/淑妃（旧宠妃）、李鹤（贴身太监）',
+   notes:'女主怀疑其重生，但三人均不知对方秘密——信息不对称是最大张力来源'}
+];
+
+let books=[],cur=null,spChs=[],apiKey='';
+let curChars=[],curIntros=[];
+let editingCharId=null,editingIntroId=null;
+let pendingSaveData=null;
+
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+function init(){
+  apiKey=localStorage.getItem(API_KEY_STORE)||'';
+  if(apiKey)document.getElementById('api-overlay').style.display='none';
+  books=lsGet(BK)||[];
+  if(!books.length){
+    books=[{id:PID,name:'芍药媚君心',author:'',genre:'古风言情'}];
+    lsSet(BK,books);
+    lsSet(CHK(PID),PEONY_CHARS);
+  }
+  renderSidebar();renderLib();
+}
+
+function saveApiKey(){const k=document.getElementById('api-key-input').value.trim();if(!k){alert('请输入 API Key');return}apiKey=k;localStorage.setItem(API_KEY_STORE,k);document.getElementById('api-overlay').style.display='none'}
+function skipApiKey(){document.getElementById('api-overlay').style.display='none'}
+function showApiSetting(){document.getElementById('api-key-input').value=apiKey;document.getElementById('api-overlay').style.display='flex'}
+
+function renderSidebar(){
+  document.getElementById('sb-books').innerHTML=books.map(b=>`
+    <button class="sb-book ${cur&&cur.id===b.id?'active':''}" onclick="openBook('${b.id}')">
+      <span style="font-size:14px">${b.id===PID?'🌸':'📖'}</span>
+      <span class="bname">${b.name}</span>
+    </button>`).join('');
+}
+function renderLib(){
+  let h=books.map(b=>`
+    <div class="lib-card" onclick="openBook('${b.id}')">
+      <button class="lib-del" onclick="event.stopPropagation();delBook('${b.id}')">✕</button>
+      <div style="font-size:28px;margin-bottom:10px">${b.id===PID?'🌸':'📖'}</div>
+      <div class="lib-name">${b.name}</div>
+      <div class="lib-meta">${b.genre||''}${b.author?' · '+b.author:''}</div>
+      ${b.id===PID?'<div class="peony-badge">✦ 六线专属追踪</div>':''}
+    </div>`).join('');
+  h+=`<button class="lib-add" onclick="showModal('book')"><span style="font-size:22px">＋</span><span>新增书籍</span></button>`;
+  document.getElementById('lib-grid').innerHTML=h;
+}
+
+let modalMode='';
+function showModal(mode,data={}){
+  modalMode=mode;
+  const title=document.getElementById('modal-title'),body=document.getElementById('modal-body'),confirm=document.getElementById('modal-confirm');
+  if(mode==='book'){
+    title.textContent='新增书籍';
+    body.innerHTML=`<label>书名</label><input id="mb-n" placeholder="例：芍药媚君心" value="${data.name||''}"><label>作者笔名</label><input id="mb-a" placeholder="例：昔岁" value="${data.author||''}"><label>类型标签</label><input id="mb-g" placeholder="例：古风言情" value="${data.genre||''}">`;
+    confirm.onclick=addBook;
+  }else if(mode==='char'){
+    editingCharId=data.id||null;
+    title.textContent=data.id?'编辑角色':'新增角色';
+    body.innerHTML=`
+      <div class="form-row" style="margin-bottom:0">
+        <div><label>姓名</label><input id="mc-name" placeholder="宁梓韵" value="${data.name||''}"></div>
+        <div><label>角色定位</label><input id="mc-role" placeholder="女主角" value="${data.role||''}"></div>
+      </div>
+      <label>头像图示（emoji）</label><input id="mc-icon" placeholder="🦊" value="${data.icon||'👤'}" maxlength="2">
+      <label>外貌描述</label><textarea id="mc-app" rows="2">${data.appearance||''}</textarea>
+      <label>性格特点</label><textarea id="mc-per" rows="2">${data.personality||''}</textarea>
+      <label>人物背景</label><textarea id="mc-bg" rows="3">${data.background||''}</textarea>
+      <label>特殊能力 / 特殊设定</label><textarea id="mc-abi" rows="2">${data.ability||''}</textarea>
+      <label>人物关系</label><textarea id="mc-rel" rows="2">${data.relations||''}</textarea>
+      <label>创作备注</label><textarea id="mc-note" rows="2">${data.notes||''}</textarea>`;
+    confirm.onclick=saveChar;
+  }else if(mode==='intro'){
+    editingIntroId=data.id||null;
+    title.textContent=data.id?'编辑简介':'新增简介版本';
+    body.innerHTML=`
+      <label>版本名称</label><input id="mi-ver" placeholder="例：晋江版、短版、方向A" value="${data.version||''}">
+      <label>简介内容</label><textarea id="mi-body" rows="8" placeholder="在这里写下这个版本的简介…">${data.body||''}</textarea>
+      <label>备注（可选）</label><input id="mi-note" placeholder="例：字数约200字，偏向权谋方向" value="${data.note||''}">`;
+    confirm.onclick=saveIntro;
+  }
+  document.getElementById('modal').style.display='block';
+}
+function closeModal(){document.getElementById('modal').style.display='none';editingCharId=null;editingIntroId=null}
+
+function addBook(){
+  const n=document.getElementById('mb-n').value.trim();if(!n){alert('请填写书名');return}
+  const b={id:'bk'+Date.now(),name:n,author:document.getElementById('mb-a').value.trim(),genre:document.getElementById('mb-g').value.trim()};
+  books.push(b);lsSet(BK,books);closeModal();renderSidebar();renderLib();
+}
+function delBook(bid){
+  const b=books.find(x=>x.id===bid);if(!confirm(`确定删除「${b.name}」？`))return;
+  books=books.filter(x=>x.id!==bid);lsSet(BK,books);
+  [CK(bid),CHK(bid),IK(bid)].forEach(k=>localStorage.removeItem(k));
+  renderSidebar();renderLib();
+}
+function openBook(bid){
+  cur=books.find(b=>b.id===bid);if(!cur)return;
+  cur.chapters=lsGet(CK(bid))||[];
+  curChars=lsGet(CHK(bid))||[];
+  curIntros=lsGet(IK(bid))||[];
+  document.getElementById('bc-name').textContent=cur.name;
+  document.getElementById('bc-badge').innerHTML=cur.id===PID?'<span class="peony-badge">✦ 六线追踪</span>':'';
+  document.getElementById('book-title-display').textContent=cur.name;
+  document.getElementById('book-sub-display').textContent=[cur.genre,cur.author].filter(Boolean).join(' · ')||'小说';
+  document.getElementById('view-lib').style.display='none';
+  document.getElementById('view-book').style.display='block';
+  renderSidebar();sbt('ov');renderOv();
+}
+function goLib(){cur=null;document.getElementById('view-lib').style.display='block';document.getElementById('view-book').style.display='none';renderSidebar();renderLib()}
+
+function sbt(name){
+  const ns=['ov','add','split','search','fore','chars','intro'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',ns[i]===name));
+  ns.forEach(n=>{const e=document.getElementById('bt-'+n);if(e)e.classList.toggle('on',n===name)});
+  if(name==='fore')renderFore();
+  if(name==='search')doSearch();
+  if(name==='chars')renderChars();
+  if(name==='intro')renderIntros();
+}
+
+// ── Overview ──
+function renderOv(){
+  if(!cur)return;
+  const chs=[...cur.chapters].sort((a,b)=>a.num-b.num);
+  const fc=chs.reduce((n,c)=>n+(c.fore?c.fore.split(',').filter(x=>x.trim()).length:0),0);
+  const rc=chs.reduce((n,c)=>n+(c.res?c.res.split(',').filter(x=>x.trim()).length:0),0);
+  document.getElementById('s0').textContent=chs.length;
+  document.getElementById('s1').textContent=fc;
+  document.getElementById('s2').textContent=rc;
+  const el=document.getElementById('ch-list');
+  if(!chs.length){el.innerHTML='<div class="empty">还没有章节记录<br>点「新增章节」或用「AI 拆章」批量导入</div>';return}
+  el.innerHTML=chs.map(c=>{
+    const verCount=(c.versions||[]).length;
+    return`<div class="ch-card">
+      <div class="ch-hd">
+        <span class="ch-num">第 ${c.num} 章</span>
+        <div style="display:flex;gap:5px;align-items:center">
+          ${verCount>0?`<span class="tag tag-ver" style="cursor:pointer" onclick="toggleVers(${c.num},this)">📋 ${verCount} 个历史版本</span>`:''}
+          <button class="btn btn-sm" onclick="editCh(${c.num})">编辑</button>
+          <button class="btn btn-sm btn-danger" onclick="delCh(${c.num})">删除</button>
+        </div>
+      </div>
+      <div class="ch-title">${c.title||'（未命名）'}</div>
+      <div class="ch-sum">${c.summary||'（无摘要）'}</div>
+      <div class="tags">
+        ${(c.chars||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tc">${x.trim()}</span>`).join('')}
+        ${(c.fore||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tf">▸ ${x.trim()}</span>`).join('')}
+        ${(c.res||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tr">✓ ${x.trim()}</span>`).join('')}
+      </div>
+      <div id="vers-${c.num}" style="display:none;margin-top:10px">
+        ${renderVersionList(c)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderVersionList(c){
+  const vers=c.versions||[];
+  if(!vers.length)return'';
+  return`<div class="ver-list">
+    <div class="ver-item current-ver">
+      <div><div class="ver-label">✦ 当前版本</div><div class="ver-time">${c.savedAt?new Date(c.savedAt).toLocaleString('zh-TW'):''}</div></div>
+      <div class="ver-actions"></div>
+    </div>
+    ${vers.map((v,i)=>`
+      <div class="ver-item">
+        <div><div class="ver-label">${v.label||'版本 '+(vers.length-i)}</div><div class="ver-time">${new Date(v.savedAt).toLocaleString('zh-TW')}</div></div>
+        <div class="ver-actions">
+          <button class="btn btn-sm" onclick="showDiff(${c.num},${i})">对比差异</button>
+          <button class="btn btn-sm" onclick="restoreVer(${c.num},${i})">还原</button>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function toggleVers(num,el){
+  const wrap=document.getElementById('vers-'+num);
+  const visible=wrap.style.display!=='none';
+  wrap.style.display=visible?'none':'block';
+  el.textContent=visible?`📋 ${(cur.chapters.find(c=>c.num===num).versions||[]).length} 个历史版本`:'▲ 收起版本历史';
+}
+
+// ── Chapter CRUD ──
+function initSaveCh(){
+  const num=parseInt(document.getElementById('fn').value);
+  if(!num){alert('请填写章节号');return}
+  const existing=cur.chapters.find(c=>c.num===num);
+  const newContent=document.getElementById('fc').value.trim();
+  const newSummary=document.getElementById('fs').value.trim();
+  if(existing&&(existing.content!==newContent||existing.summary!==newSummary)){
+    // 有变动，询问
+    pendingSaveData={num};
+    document.getElementById('save-choice-overlay').style.display='flex';
+    document.getElementById('new-ver-label-wrap').style.display='block';
+  }else{
+    doSaveCh('overwrite');
+  }
+}
+
+function hideSaveChoice(){document.getElementById('save-choice-overlay').style.display='none';pendingSaveData=null}
+
+function doSaveCh(mode){
+  const num=parseInt(document.getElementById('fn').value);
+  if(!num)return;
+  const entry={
+    num,
+    title:document.getElementById('ft').value.trim(),
+    summary:document.getElementById('fs').value.trim(),
+    chars:document.getElementById('fch').value.trim(),
+    fore:document.getElementById('ff').value.trim(),
+    res:document.getElementById('fres').value.trim(),
+    content:document.getElementById('fc').value.trim(),
+    savedAt:Date.now()
+  };
+  const idx=cur.chapters.findIndex(c=>c.num===num);
+  if(idx>=0){
+    if(mode==='new'){
+      const old=cur.chapters[idx];
+      const verLabel=document.getElementById('new-ver-label').value.trim();
+      const snapshot={
+        id:'ver_'+Date.now(),
+        label:verLabel||'版本 '+(((old.versions||[]).length)+1),
+        title:old.title,summary:old.summary,chars:old.chars,fore:old.fore,res:old.res,
+        content:old.content||'',savedAt:old.savedAt||Date.now()
+      };
+      entry.versions=[snapshot,...(old.versions||[])];
+    }else{
+      entry.versions=cur.chapters[idx].versions||[];
+    }
+    cur.chapters[idx]=entry;
+  }else{
+    entry.versions=[];
+    cur.chapters.push(entry);
+  }
+  lsSet(CK(cur.id),cur.chapters);
+  hideSaveChoice();
+  clearForm();sbt('ov');renderOv();
+}
+
+function clearForm(){['fn','ft','fc','fs','fch','ff','fres'].forEach(id=>document.getElementById(id).value='');clearAiBox()}
+function clearAiBox(){const b=document.getElementById('ai-box');b.textContent='';b.style.display='none'}
+
+function delCh(num){
+  if(!confirm(`删除第 ${num} 章（含所有版本）？`))return;
+  cur.chapters=cur.chapters.filter(c=>c.num!==num);lsSet(CK(cur.id),cur.chapters);renderOv();
+}
+
+function editCh(num){
+  const c=cur.chapters.find(x=>x.num===num);if(!c)return;
+  document.getElementById('fn').value=c.num;
+  document.getElementById('ft').value=c.title||'';
+  document.getElementById('fs').value=c.summary||'';
+  document.getElementById('fch').value=c.chars||'';
+  document.getElementById('ff').value=c.fore||'';
+  document.getElementById('fres').value=c.res||'';
+  document.getElementById('fc').value=c.content||'';
+  clearAiBox();sbt('add');
+}
+
+function restoreVer(num,vIdx){
+  if(!confirm('还原此版本？当前版本会变成历史版本保留。'))return;
+  const c=cur.chapters.find(x=>x.num===num);if(!c)return;
+  const ver=c.versions[vIdx];
+  // 把当前版本存入历史
+  const snapshot={id:'ver_'+Date.now(),label:'还原前版本',title:c.title,summary:c.summary,chars:c.chars,fore:c.fore,res:c.res,content:c.content||'',savedAt:c.savedAt||Date.now()};
+  c.versions.splice(vIdx,1);
+  c.versions.unshift(snapshot);
+  c.title=ver.title;c.summary=ver.summary;c.chars=ver.chars;c.fore=ver.fore;c.res=ver.res;c.content=ver.content;c.savedAt=Date.now();
+  lsSet(CK(cur.id),cur.chapters);renderOv();
+}
+
+// ── Diff ──
+function computeDiff(oldStr,newStr){
+  // 按标点/换行分词，提升中文可读性
+  const tok=s=>{const r=[];let buf='';for(const c of s){buf+=c;if('，。！？、；：\n「」『』【】（）'.includes(c)||buf.length>=4){r.push(buf);buf=''}}if(buf)r.push(buf);return r};
+  const a=tok(oldStr||''),b=tok(newStr||'');
+  const n=a.length,m=b.length;
+  if(n===0&&m===0)return[];
+  // LCS DP (capped at 800 tokens each for performance)
+  const A=a.slice(0,800),B=b.slice(0,800),N=A.length,M=B.length;
+  const dp=Array.from({length:N+1},()=>new Int32Array(M+1));
+  for(let i=1;i<=N;i++)for(let j=1;j<=M;j++){
+    if(A[i-1]===B[j-1])dp[i][j]=dp[i-1][j-1]+1;
+    else dp[i][j]=Math.max(dp[i-1][j],dp[i][j-1]);
+  }
+  const res=[];let i=N,j=M;
+  while(i>0||j>0){
+    if(i>0&&j>0&&A[i-1]===B[j-1]){res.unshift({t:'same',v:A[i-1]});i--;j--}
+    else if(j>0&&(i===0||dp[i][j-1]>=dp[i-1][j])){res.unshift({t:'add',v:B[j-1]});j--}
+    else{res.unshift({t:'del',v:A[i-1]});i--}
+  }
+  // append remainder if capped
+  if(a.length>800||b.length>800)res.push({t:'same',v:'\n\n…（文本过长，仅显示前段差异）'});
+  return res;
+}
+
+function showDiff(num,vIdx){
+  const c=cur.chapters.find(x=>x.num===num);if(!c)return;
+  const ver=c.versions[vIdx];
+  const oldContent=ver.content||'（无正文记录）';
+  const newContent=c.content||'（无正文记录）';
+  document.getElementById('diff-title').textContent=`第${num}章「${c.title}」— 当前版本 vs ${ver.label||'历史版本'}`;
+  const diff=computeDiff(oldContent,newContent);
+  // Group consecutive same-type
+  const groups=[];let cur2=null;
+  for(const d of diff){if(cur2&&cur2.t===d.t)cur2.v+=d.v;else{cur2={...d};groups.push(cur2)}}
+  document.getElementById('diff-content').innerHTML=groups.map(g=>{
+    const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if(g.t==='same')return`<span>${esc(g.v)}</span>`;
+    if(g.t==='add')return`<span class="diff-add">${esc(g.v)}</span>`;
+    return`<span class="diff-del">${esc(g.v)}</span>`;
+  }).join('');
+  document.getElementById('diff-overlay').style.display='flex';
+}
+function hideDiff(){document.getElementById('diff-overlay').style.display='none'}
+
+// ── AI ──
+function getSys(bid){
+  if(bid!==PID)return`你是一名小说编辑，协助作者整理章节大纲。针对章节内容输出（纯文字，不加Markdown）：\n【剧情摘要】约80字\n【出场人物】姓名逗号分隔\n【本章伏笔】关键伏笔（若无写「无」）\n【已收伏笔】本章收回的前文伏笔（若无写「无」）`;
+  return`你是「芍药媚君心」的专属章节分析编辑。本书是古风重生言情，主要角色：宁梓韵（祝家灵主后人，女主，重生），禾凛（大秦摄政王/皇帝，男主，伪装腿疾，是否重生未知），亘安（大周皇帝，女主前任，女主怀疑其重生）。\n\n本书六条主线伏笔，请在分析时主动追踪：\n・禾凛腿伤真相：金针震碎、强行站立——真实腿况与身体秘密\n・情蛊与白发：体内情蛊进展、白发触发条件与压制方式\n・祝家灭门真相：二十年前大火幕后黑手尚未完全揭晓\n・祝心华生死之谜：棺材是空的——母亲可能尚在人世\n・亘安同心草执念：子母连心草追踪女主情感，亘安偏执图谋\n・三人重生身份互隐：女主怀疑亘安重生；禾凛是否重生未知；三人互相不知对方秘密\n\n请输出（纯文字，不加Markdown）：\n【剧情摘要】约80字，含情感推进与权谋进展\n【出场人物】姓名逗号分隔\n【本章伏笔】本章新埋或推进的伏笔，注明属于哪条主线（若无写「无」）\n【已收伏笔】本章明确揭开或收回的前文伏笔（若无写「无」）\n【主线进展】列出本章有推进的主线（格式：主线名：一句话进展）`;
+}
+async function callAI(content,bid){
+  if(!apiKey){alert('请先设置 API Key');throw new Error('no key')}
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:getSys(bid||cur?.id),messages:[{role:'user',content:content.slice(0,3000)}]})});
+  const d=await resp.json();if(d.error)throw new Error(d.error.message);return d.content?.[0]?.text||'';
+}
+function parseAI(text){const g=l=>{const m=text.match(new RegExp(`【${l}】([\\s\\S]*?)(?=【|$)`));return m?m[1].trim():''};return{summary:g('剧情摘要'),chars:g('出场人物').replace(/\n/g,''),fore:g('本章伏笔'),res:g('已收伏笔')}}
+function fillForm(p){if(p.summary)document.getElementById('fs').value=p.summary;if(p.chars)document.getElementById('fch').value=p.chars;if(p.fore&&p.fore!=='无')document.getElementById('ff').value=p.fore;if(p.res&&p.res!=='无')document.getElementById('fres').value=p.res}
+async function doAI(){
+  const c=document.getElementById('fc').value.trim();if(!c){alert('请先贴入正文');return}
+  const btn=document.getElementById('ai-btn');btn.disabled=true;btn.textContent='分析中…';
+  const box=document.getElementById('ai-box');box.style.display='block';box.textContent='正在分析…';
+  try{const r=await callAI(c);box.textContent=r;fillForm(parseAI(r))}
+  catch(e){if(e.message!=='no key')box.textContent='分析失败：'+e.message}
+  btn.disabled=false;btn.textContent='✦ AI 分析';
+}
+
+// ── Split ──
+function c2n(s){const m={零:0,一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,百:100,千:1000};if(/^\d+$/.test(s))return parseInt(s);let r=0,c=0;for(const x of s){const v=m[x];if(v===undefined)continue;if(v>=10){if(!c)c=1;r+=c*v;c=0}else c=v}return r+c}
+function doSplit(){
+  const text=document.getElementById('sp-in').value.trim();if(!text){alert('请先贴入全文');return}
+  const pat=/第[零一二三四五六七八九十百千0-9０-９]+章[　\s]*/g;
+  const ms=[...text.matchAll(pat)];if(!ms.length){alert('未检测到「第X章」标记');return}
+  spChs=ms.map((m,i)=>{
+    const s=m.index,e=i+1<ms.length?ms[i+1].index:text.length;
+    const raw=text.slice(s,e).trim();
+    const ns=m[0].match(/[零一二三四五六七八九十百千0-9０-９]+/)?.[0]||'';
+    const num=c2n(ns)||parseInt(ns)||i+1;
+    const after=raw.slice(m[0].length).trim();
+    return{num,title:after.split(/\n/)[0].slice(0,10).trim(),body:after,content:after,summary:'',chars:'',fore:'',res:''};
+  });
+  renderSpList();
+}
+function renderSpList(){
+  document.getElementById('sp-result').style.display='block';
+  document.getElementById('sp-cnt').textContent=spChs.length;
+  document.getElementById('sp-list').innerHTML=spChs.map(c=>`
+    <div class="split-item">
+      <span class="split-num">第${c.num}章</span>
+      <div style="flex:1">
+        <div style="font-weight:500">${c.title||'（自动识别）'}</div>
+        <div style="color:var(--ink-3);font-size:11px;margin-top:2px">${c.body.slice(0,90)}…</div>
+        ${c.summary?`<div style="color:var(--ink-2);font-size:11px;margin-top:3px">摘要：${c.summary}</div>`:''}
+        ${(c.fore&&c.fore!=='无')?`<div style="color:var(--gold);font-size:11px;margin-top:2px">▸ ${c.fore}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+async function aiAllSum(){
+  if(!spChs.length)return;
+  const btn=document.getElementById('aa-btn');btn.disabled=true;
+  const pw=document.getElementById('sp-prog'),pf=document.getElementById('pf'),pt=document.getElementById('pt');
+  pw.style.display='block';
+  for(let i=0;i<spChs.length;i++){
+    const c=spChs[i];pt.textContent=`正在分析第 ${c.num} 章（${i+1}/${spChs.length}）`;pf.style.width=Math.round(i/spChs.length*100)+'%';
+    try{const r=await callAI(c.body,cur.id);const p=parseAI(r);c.summary=p.summary||'';c.chars=p.chars||'';c.fore=(p.fore&&p.fore!=='无')?p.fore:'';c.res=(p.res&&p.res!=='无')?p.res:''}catch(e){break}
+    await new Promise(r=>setTimeout(r,700));
+  }
+  pf.style.width='100%';pt.textContent='完成！';renderSpList();btn.disabled=false;setTimeout(()=>pw.style.display='none',2000);
+}
+async function impAll(){
+  if(!spChs.length)return;
+  let added=0,skipped=0;
+  spChs.forEach(c=>{if(cur.chapters.find(x=>x.num===c.num)){skipped++;return}cur.chapters.push({num:c.num,title:c.title,summary:c.summary,chars:c.chars,fore:c.fore,res:c.res,content:c.content||'',versions:[],savedAt:Date.now()});added++});
+  lsSet(CK(cur.id),cur.chapters);
+  alert(`导入完成：新增 ${added} 章${skipped?`，跳过 ${skipped} 章（重复）`:''}`);
+  spChs=[];document.getElementById('sp-in').value='';document.getElementById('sp-result').style.display='none';sbt('ov');renderOv();
+}
+function clearSplit(){document.getElementById('sp-in').value='';document.getElementById('sp-result').style.display='none';spChs=[]}
+
+// ── Search ──
+function doSearch(){
+  const q=(document.getElementById('sq').value||'').trim().toLowerCase();
+  const el=document.getElementById('s-res');
+  if(!q||!cur){el.innerHTML='<div class="empty">输入关键词开始搜索</div>';return}
+  const rs=cur.chapters.filter(c=>[c.title,c.summary,c.chars,c.fore,c.res].some(f=>(f||'').toLowerCase().includes(q))).sort((a,b)=>a.num-b.num);
+  if(!rs.length){el.innerHTML='<div class="empty">未找到相关章节</div>';return}
+  const hi=s=>s?(s+'').replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<mark class="hl">${m}</mark>`):'';
+  el.innerHTML=rs.map(c=>`<div class="ch-card"><div class="ch-hd"><span class="ch-num">第 ${c.num} 章</span></div><div class="ch-title">${hi(c.title)}</div><div class="ch-sum">${hi(c.summary)}</div><div class="tags">${(c.chars||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tc">${hi(x.trim())}</span>`).join('')}</div></div>`).join('');
+}
+
+// ── Foreshadow ──
+function renderFore(){
+  if(!cur)return;
+  const el=document.getElementById('fore-content');
+  const op=[],cl=[];
+  cur.chapters.forEach(c=>{
+    (c.fore||'').split(',').filter(x=>x.trim()).forEach(f=>op.push({ch:c.num,t:f.trim()}));
+    (c.res||'').split(',').filter(x=>x.trim()).forEach(r=>cl.push({ch:c.num,t:r.trim()}));
+  });
+  let h='';
+  if(cur.id===PID&&cur.chapters.length>0){
+    h+=`<div style="margin-bottom:1rem"><div style="font-family:'Noto Serif SC',serif;font-size:15px;font-weight:500;margin-bottom:1rem">六条主线追踪</div>`;
+    LINES.forEach(ln=>{
+      const rel=cur.chapters.filter(c=>(c.fore||'').includes(ln.n)||(c.res||'').includes(ln.n)).sort((a,b)=>a.num-b.num);
+      h+=`<div class="fore-card"><div class="fore-card-title"><span class="dot dot-o"></span>${ln.n}</div><div class="fore-card-desc">${ln.d}</div><div>${rel.length?rel.map(c=>`<span class="fore-chap-tag">第${c.num}章</span>`).join(''):'<span style="color:var(--ink-4)">暂无记录</span>'}</div></div>`;
+    });
+    h+='</div>';
+  }
+  h+=`<div style="font-family:'Noto Serif SC',serif;font-size:15px;font-weight:500;margin-bottom:1rem">全部伏笔列表</div>`;
+  if(!op.length&&!cl.length){h+='<div class="empty">暂无伏笔记录</div>'}
+  else{
+    if(op.length){h+=`<div style="font-size:12px;font-weight:500;color:var(--ink-2);margin-bottom:8px;display:flex;align-items:center;gap:6px"><span class="dot dot-o"></span>未收回 (${op.length})</div>`;h+=op.map(f=>`<div class="fore-item"><div style="display:flex;align-items:flex-start;gap:5px"><span class="dot dot-o" style="margin-top:4px"></span><span>${f.t}</span></div><span class="fore-item-ch">第${f.ch}章</span></div>`).join('');h+='<div style="height:1rem"></div>'}
+    if(cl.length){h+=`<div style="font-size:12px;font-weight:500;color:var(--ink-2);margin-bottom:8px;display:flex;align-items:center;gap:6px"><span class="dot dot-c"></span>已收回 (${cl.length})</div>`;h+=cl.map(r=>`<div class="fore-item"><div style="display:flex;align-items:flex-start;gap:5px"><span class="dot dot-c" style="margin-top:4px"></span><span>${r.t}</span></div><span class="fore-item-ch">第${r.ch}章</span></div>`).join('')}
+  }
+  el.innerHTML=h;
+}
+
+// ── Characters ──
+function renderChars(){
+  if(!cur)return;
+  document.getElementById('chars-detail').style.display='none';
+  document.getElementById('chars-list-view').style.display='block';
+  let h=curChars.map(c=>`
+    <div class="char-card ${c.isMain?'main-char':''}" onclick="showCharDetail('${c.id}')">
+      <button class="char-del" onclick="event.stopPropagation();delChar('${c.id}')">✕</button>
+      <div class="char-avatar">${c.icon||'👤'}</div>
+      <div class="char-name">${c.name}</div>
+      <div class="char-role">${c.role||''}</div>
+      <div class="char-desc">${c.background||c.personality||'（暂无简介）'}</div>
+    </div>`).join('');
+  h+=`<button class="char-add" onclick="showModal('char')"><span style="font-size:22px">＋</span><span>新增角色</span></button>`;
+  document.getElementById('char-grid').innerHTML=h;
+}
+function showCharDetail(cid){
+  const c=curChars.find(x=>x.id===cid);if(!c)return;
+  document.getElementById('chars-list-view').style.display='none';
+  const el=document.getElementById('chars-detail');el.style.display='block';
+  const fields=[{label:'外貌描述',val:c.appearance},{label:'性格特点',val:c.personality},{label:'人物背景',val:c.background},{label:'特殊能力',val:c.ability},{label:'人物关系',val:c.relations},{label:'创作备注',val:c.notes}].filter(f=>f.val);
+  el.innerHTML=`
+    <div style="margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+      <button class="btn btn-sm" onclick="renderChars()">← 返回</button>
+      <button class="btn btn-sm" onclick="showModal('char',curChars.find(x=>x.id==='${cid}'))">编辑</button>
+    </div>
+    <div class="form-card">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+        <div class="char-avatar-lg">${c.icon||'👤'}</div>
+        <div>
+          <div style="font-family:'Noto Serif SC',serif;font-size:18px;font-weight:500;margin-bottom:4px">${c.name}</div>
+          <div style="font-size:12px;color:var(--ink-3)">${c.role||''}${c.isMain?' · 主要角色':''}</div>
+        </div>
+      </div>
+      ${fields.map(f=>`<div style="margin-bottom:1rem"><div style="font-size:11px;color:var(--ink-3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid var(--border)">${f.label}</div><div style="font-size:13px;color:var(--ink-2);line-height:1.8;white-space:pre-wrap">${f.val}</div></div>`).join('')}
+    </div>`;
+}
+function saveChar(){
+  const name=document.getElementById('mc-name').value.trim();if(!name){alert('请填写姓名');return}
+  const entry={id:editingCharId||'char_'+Date.now(),name,role:document.getElementById('mc-role').value.trim(),icon:document.getElementById('mc-icon').value.trim()||'👤',appearance:document.getElementById('mc-app').value.trim(),personality:document.getElementById('mc-per').value.trim(),background:document.getElementById('mc-bg').value.trim(),ability:document.getElementById('mc-abi').value.trim(),relations:document.getElementById('mc-rel').value.trim(),notes:document.getElementById('mc-note').value.trim(),isMain:false};
+  const i=curChars.findIndex(c=>c.id===entry.id);
+  if(i>=0){entry.isMain=curChars[i].isMain;curChars[i]=entry}else curChars.push(entry);
+  lsSet(CHK(cur.id),curChars);closeModal();renderChars();
+}
+function delChar(cid){const c=curChars.find(x=>x.id===cid);if(!confirm(`删除角色「${c.name}」？`))return;curChars=curChars.filter(x=>x.id!==cid);lsSet(CHK(cur.id),curChars);renderChars()}
+
+// ── Intros ──
+function renderIntros(){
+  if(!cur)return;
+  const el=document.getElementById('intro-list');
+  if(!curIntros.length){el.innerHTML='<div class="empty">还没有简介版本<br>点下方「新增简介版本」开始收集想法</div>';return}
+  el.innerHTML=curIntros.map(iv=>`
+    <div class="intro-card ${iv.isActive?'active-intro':''}">
+      <div class="intro-header">
+        <div class="intro-ver">${iv.version||'未命名版本'}</div>
+        <div>${iv.isActive?'<span class="badge-active">✦ 使用中</span>':'<span class="badge-draft">草稿</span>'}</div>
+      </div>
+      <div class="intro-body">${iv.body||'（无内容）'}</div>
+      ${iv.note?`<div class="intro-meta">备注：${iv.note}</div>`:''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        ${!iv.isActive?`<button class="btn btn-sm btn-gold" onclick="setActiveIntro('${iv.id}')">设为使用中</button>`:''}
+        <button class="btn btn-sm" onclick="showModal('intro',curIntros.find(x=>x.id==='${iv.id}'))">编辑</button>
+        <button class="btn btn-sm btn-danger" onclick="delIntro('${iv.id}')">删除</button>
+      </div>
+    </div>`).join('');
+}
+function saveIntro(){
+  const body=document.getElementById('mi-body').value.trim();if(!body){alert('请填写简介内容');return}
+  const entry={id:editingIntroId||'intro_'+Date.now(),version:document.getElementById('mi-ver').value.trim()||'版本'+(curIntros.length+1),body,note:document.getElementById('mi-note').value.trim(),isActive:false,createdAt:Date.now()};
+  const i=curIntros.findIndex(x=>x.id===entry.id);
+  if(i>=0){entry.isActive=curIntros[i].isActive;curIntros[i]=entry}else curIntros.push(entry);
+  lsSet(IK(cur.id),curIntros);closeModal();renderIntros();
+}
+function setActiveIntro(iid){curIntros.forEach(iv=>iv.isActive=iv.id===iid);lsSet(IK(cur.id),curIntros);renderIntros()}
+function delIntro(iid){const iv=curIntros.find(x=>x.id===iid);if(!confirm(`删除「${iv.version}」版本？`))return;curIntros=curIntros.filter(x=>x.id!==iid);lsSet(IK(cur.id),curIntros);renderIntros()}
+
+// ── 汇出 / 汇入 ──
+function exportData(){
+  const allKeys=Object.keys(localStorage).filter(k=>k.startsWith("novel_")||k===API_KEY_STORE);
+  const data={};
+  allKeys.forEach(k=>{try{data[k]=JSON.parse(localStorage.getItem(k))}catch(e){data[k]=localStorage.getItem(k)}});
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const date=new Date().toISOString().slice(0,10);
+  a.href=url;a.download=`novel-backup-${date}.json`;a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      const keys=Object.keys(data);
+      if(!keys.some(k=>k.startsWith("novel_"))){alert("档案格式不正确，请选择由本工具汇出的备份档案");return}
+      if(!confirm(`即将汇入 ${keys.length} 笔数据，这会覆盖目前此浏览器的所有记录，确定继续？`))return;
+      keys.forEach(k=>{
+        try{localStorage.setItem(k,typeof data[k]==="string"?data[k]:JSON.stringify(data[k]))}catch(err){}
+      });
+      alert("汇入成功！页面即将重新整理。");
+      location.reload();
+    }catch(err){alert("读取档案失败："+err.message)}
+  };
+  reader.readAsText(file);
+  event.target.value="";
+}
+
+init();
+</script>
+</body>
+</html>
