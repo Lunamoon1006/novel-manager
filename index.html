@@ -254,6 +254,7 @@ textarea{resize:vertical}
     <div id="view-lib">
       <div class="page-title">书库总览</div>
       <div class="page-sub">点击书籍进入管理，或新增书籍</div>
+      <div class="stats" id="lib-stats" style="margin-bottom:1.5rem;display:none"></div>
       <div class="lib-grid" id="lib-grid"></div>
     </div>
 
@@ -462,14 +463,15 @@ function skipApiKey(){document.getElementById('api-overlay').style.display='none
 function showApiSetting(){document.getElementById('api-key-input').value=apiKey;document.getElementById('api-overlay').style.display='flex'}
 
 function bookBtn(b){
-  return`<button class="sb-book ${cur&&cur.id===b.id?'active':''}" onclick="openBook('${b.id}')"
+  return`<div class="sb-book ${cur&&cur.id===b.id?'active':''}" onclick="openBook('${b.id}')"
     draggable="true" ondragstart="sbDragStart(event,'book','${b.id}')"
     ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drop-above')"
     ondragleave="this.classList.remove('drop-above')"
-    ondrop="sbDropOnBook(event,'${b.id}',this)">
+    ondrop="sbDropOnBook(event,'${b.id}',this)" style="cursor:pointer">
     <span style="font-size:14px">${b.id===PID?'🌸':'📖'}</span>
     <span class="bname">${b.name}</span>
-  </button>`;
+    <span style="color:var(--ink-4);font-size:12px;margin-left:auto;cursor:grab;flex-shrink:0" title="拖曳排序">⠿</span>
+  </div>`;
 }
 function renderSidebar(){
   const sBooks=[...books].sort((a,b)=>(a.order||0)-(b.order||0));
@@ -479,10 +481,10 @@ function renderSidebar(){
     const fb=sBooks.filter(b=>b.folderId===f.id);
     html+=`<div>
       <div class="sb-folder-hd${f.collapsed?'':' open'}"
-        draggable="true" ondragstart="sbDragStart(event,'folder','${f.id}')"
         ondragover="event.preventDefault();this.classList.add('sb-drop-target')"
         ondragleave="this.classList.remove('sb-drop-target')"
         ondrop="sbDropOnFolder(event,'${f.id}',this)">
+        <span draggable="true" ondragstart="sbDragStart(event,'folder','${f.id}')" style="cursor:grab;color:var(--ink-4);font-size:11px;padding:0 2px" title="拖曳排序">⠿</span>
         <span class="fold-arrow">▶</span>
         <span class="sb-folder-name" onclick="toggleFolder('${f.id}')">${f.name}</span>
         <div class="sb-folder-acts">
@@ -542,6 +544,18 @@ function sbDropOnBook(e,tid,el){
   lsSet(BK,books);dragData=null;renderSidebar();
 }
 function renderLib(){
+  // 统计仪表板
+  const statsEl=document.getElementById('lib-stats');
+  if(books.length){
+    const totalCh=books.reduce((n,b)=>{const chs=lsGet(CK(b.id))||[];return n+chs.length;},0);
+    const totalWcAll=books.reduce((n,b)=>{const chs=lsGet(CK(b.id))||[];return n+chs.reduce((s,c)=>s+wc(c.content),0);},0);
+    const wcFmt=v=>v>=10000?(v/10000).toFixed(1)+'万':v.toLocaleString();
+    statsEl.style.display='grid';
+    statsEl.innerHTML=`
+      <div class="stat"><div class="stat-n">${books.length}</div><div class="stat-l">书籍数</div></div>
+      <div class="stat"><div class="stat-n">${totalCh}</div><div class="stat-l">总章节</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--ink-2)">${wcFmt(totalWcAll)}</div><div class="stat-l">累计字数</div></div>`;
+  }else{statsEl.style.display='none';}
   let h=books.map(b=>`
     <div class="lib-card" onclick="openBook('${b.id}')">
       <button class="lib-del" onclick="event.stopPropagation();delBook('${b.id}')">✕</button>
@@ -599,7 +613,7 @@ function addBook(){
 }
 function editBookInfo(){
   if(!cur)return;
-  showModal('book',{id:cur.id,name:cur.name,author:cur.author||'',genre:cur.genre||''});
+  showModal('book',{id:cur.id,name:cur.name,author:cur.author||'',genre:cur.genre||'',folderId:cur.folderId||null});
 }
 function saveEditBook(bid){
   const n=document.getElementById('mb-n').value.trim();if(!n){alert('请填写书名');return}
