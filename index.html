@@ -712,27 +712,29 @@ function restoreVer(num,vIdx){
 
 // ── Diff ──
 function computeDiff(oldStr,newStr){
-  // 按标点/换行分词，提升中文可读性
+  function lcsArr(a,b){
+    const N=a.length,M=b.length;
+    const dp=Array.from({length:N+1},()=>new Int32Array(M+1));
+    for(let i=1;i<=N;i++)for(let j=1;j<=M;j++){
+      if(a[i-1]===b[j-1])dp[i][j]=dp[i-1][j-1]+1;
+      else dp[i][j]=Math.max(dp[i-1][j],dp[i][j-1]);
+    }
+    const res=[];let i=N,j=M;
+    while(i>0||j>0){
+      if(i>0&&j>0&&a[i-1]===b[j-1]){res.unshift({t:'same',v:a[i-1]});i--;j--}
+      else if(j>0&&(i===0||dp[i][j-1]>=dp[i-1][j])){res.unshift({t:'add',v:b[j-1]});j--}
+      else{res.unshift({t:'del',v:a[i-1]});i--}
+    }
+    return res;
+  }
   const tok=s=>{const r=[];let buf='';for(const c of s){buf+=c;if('，。！？、；：\n「」『』【】（）'.includes(c)||buf.length>=4){r.push(buf);buf=''}}if(buf)r.push(buf);return r};
   const a=tok(oldStr||''),b=tok(newStr||'');
-  const n=a.length,m=b.length;
-  if(n===0&&m===0)return[];
-  // LCS DP (capped at 800 tokens each for performance)
-  const A=a.slice(0,800),B=b.slice(0,800),N=A.length,M=B.length;
-  const dp=Array.from({length:N+1},()=>new Int32Array(M+1));
-  for(let i=1;i<=N;i++)for(let j=1;j<=M;j++){
-    if(A[i-1]===B[j-1])dp[i][j]=dp[i-1][j-1]+1;
-    else dp[i][j]=Math.max(dp[i-1][j],dp[i][j-1]);
-  }
-  const res=[];let i=N,j=M;
-  while(i>0||j>0){
-    if(i>0&&j>0&&A[i-1]===B[j-1]){res.unshift({t:'same',v:A[i-1]});i--;j--}
-    else if(j>0&&(i===0||dp[i][j-1]>=dp[i-1][j])){res.unshift({t:'add',v:B[j-1]});j--}
-    else{res.unshift({t:'del',v:A[i-1]});i--}
-  }
-  // append remainder if capped
-  if(a.length>800||b.length>800)res.push({t:'same',v:'\n\n…（文本过长，仅显示前段差异）'});
-  return res;
+  if(!a.length&&!b.length)return[];
+  // 短文本：精细 token 级 diff
+  if(a.length<=800&&b.length<=800)return lcsArr(a,b);
+  // 长文本：段落级 diff，完整显示全文差异
+  const pa=(oldStr||'').split('\n'),pb=(newStr||'').split('\n');
+  return lcsArr(pa,pb).flatMap(item=>[{t:item.t,v:item.v},{t:'same',v:'\n'}]);
 }
 
 function showDiff(num,vIdx){
@@ -937,10 +939,24 @@ function doSearch(){
   const q=(document.getElementById('sq').value||'').trim().toLowerCase();
   const el=document.getElementById('s-res');
   if(!q||!cur){el.innerHTML='<div class="empty">输入关键词开始搜索</div>';return}
-  const rs=cur.chapters.filter(c=>[c.title,c.summary,c.chars,c.fore,c.res].some(f=>(f||'').toLowerCase().includes(q))).sort((a,b)=>a.num-b.num);
+  const rs=cur.chapters.filter(c=>[c.title,c.summary,c.chars,c.fore,c.res,c.content].some(f=>(f||'').toLowerCase().includes(q))).sort((a,b)=>a.num-b.num);
   if(!rs.length){el.innerHTML='<div class="empty">未找到相关章节</div>';return}
-  const hi=s=>s?(s+'').replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<mark class="hl">${m}</mark>`):'';
-  el.innerHTML=rs.map(c=>`<div class="ch-card"><div class="ch-hd"><span class="ch-num">第 ${c.num} 章</span></div><div class="ch-title">${hi(c.title)}</div><div class="ch-sum">${hi(c.summary)}</div><div class="tags">${(c.chars||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tc">${hi(x.trim())}</span>`).join('')}</div></div>`).join('');
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const hiRe=q=>new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+  const hi=s=>s?esc(s+'').replace(hiRe(q),m=>`<mark class="hl">${m}</mark>`):'';
+  function snipHi(text){
+    if(!text)return'';
+    const idx=text.toLowerCase().indexOf(q);if(idx===-1)return'';
+    const s=Math.max(0,idx-40),e=Math.min(text.length,idx+120);
+    const raw=(s>0?'…':'')+text.slice(s,e)+(e<text.length?'…':'');
+    return esc(raw).replace(hiRe(q),m=>`<mark class="hl">${m}</mark>`);
+  }
+  el.innerHTML=rs.map(c=>{
+    const metaMatch=[c.title,c.summary,c.chars,c.fore,c.res].some(f=>(f||'').toLowerCase().includes(q));
+    const contentSnip=(!metaMatch||(c.content||'').toLowerCase().includes(q))&&c.content
+      ?`<div style="font-size:12px;color:var(--ink-2);line-height:1.7;margin-top:6px;padding:6px 8px;background:var(--paper-2);border-radius:4px;border-left:2px solid var(--border)">📄 ${snipHi(c.content)}</div>`:'';
+    return`<div class="ch-card"><div class="ch-hd"><span class="ch-num">第 ${c.num} 章</span></div><div class="ch-title">${hi(c.title)||esc(c.title||'（未命名）')}</div><div class="ch-sum">${hi(c.summary)||esc(c.summary||'')}</div><div class="tags">${(c.chars||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tc">${hi(x.trim())}</span>`).join('')}${(c.fore||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tf">▸ ${hi(x.trim())}</span>`).join('')}</div>${contentSnip}</div>`;
+  }).join('');
 }
 
 // ── Foreshadow ──
