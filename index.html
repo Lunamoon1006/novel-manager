@@ -940,26 +940,35 @@ function loadSplitFile(input){
 
 // ── Search ──
 function doSearch(){
-  const q=(document.getElementById('sq').value||'').trim().toLowerCase();
+  const raw=document.getElementById('sq').value||'';
+  const q=raw.trim().toLowerCase();
   const el=document.getElementById('s-res');
   if(!q||!cur){el.innerHTML='<div class="empty">输入关键词开始搜索</div>';return}
-  const rs=cur.chapters.filter(c=>[c.title,c.summary,c.chars,c.fore,c.res,c.content].some(f=>(f||'').toLowerCase().includes(q))).sort((a,b)=>a.num-b.num);
+  const fields=['title','summary','chars','fore','res','content'];
+  const rs=cur.chapters.filter(c=>fields.some(k=>(c[k]||'').toLowerCase().includes(q))).sort((a,b)=>a.num-b.num);
   if(!rs.length){el.innerHTML='<div class="empty">未找到相关章节</div>';return}
-  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const hiRe=q=>new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
-  const hi=s=>s?esc(s+'').replace(hiRe(q),m=>`<mark class="hl">${m}</mark>`):'';
-  function snipHi(text){
+  const safeQ=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re=new RegExp('('+safeQ+')','gi');
+  function hi(s){
+    if(!s)return'';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(re,'<mark class="hl">$1</mark>');
+  }
+  function snippet(text){
     if(!text)return'';
     const idx=text.toLowerCase().indexOf(q);if(idx===-1)return'';
-    const s=Math.max(0,idx-40),e=Math.min(text.length,idx+120);
-    const raw=(s>0?'…':'')+text.slice(s,e)+(e<text.length?'…':'');
-    return esc(raw).replace(hiRe(q),m=>`<mark class="hl">${m}</mark>`);
+    const s=Math.max(0,idx-50),e=Math.min(text.length,idx+130);
+    return hi((s>0?'…':'')+text.slice(s,e)+(e<text.length?'…':''));
   }
   el.innerHTML=rs.map(c=>{
-    const metaMatch=[c.title,c.summary,c.chars,c.fore,c.res].some(f=>(f||'').toLowerCase().includes(q));
-    const contentSnip=(!metaMatch||(c.content||'').toLowerCase().includes(q))&&c.content
-      ?`<div style="font-size:12px;color:var(--ink-2);line-height:1.7;margin-top:6px;padding:6px 8px;background:var(--paper-2);border-radius:4px;border-left:2px solid var(--border)">📄 ${snipHi(c.content)}</div>`:'';
-    return`<div class="ch-card"><div class="ch-hd"><span class="ch-num">第 ${c.num} 章</span></div><div class="ch-title">${hi(c.title)||esc(c.title||'（未命名）')}</div><div class="ch-sum">${hi(c.summary)||esc(c.summary||'')}</div><div class="tags">${(c.chars||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tc">${hi(x.trim())}</span>`).join('')}${(c.fore||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tf">▸ ${hi(x.trim())}</span>`).join('')}</div>${contentSnip}</div>`;
+    const inContent=(c.content||'').toLowerCase().includes(q);
+    const snip=inContent?`<div style="font-size:12px;color:var(--ink-2);line-height:1.8;margin-top:6px;padding:6px 10px;background:var(--paper-2);border-radius:4px;border-left:3px solid var(--gold)">📄 ${snippet(c.content)}</div>`:'';
+    return`<div class="ch-card">
+      <div class="ch-hd"><span class="ch-num">第 ${c.num} 章</span></div>
+      <div class="ch-title">${hi(c.title||'（未命名）')}</div>
+      <div class="ch-sum">${hi(c.summary||'')}</div>
+      <div class="tags">${(c.chars||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tc">${hi(x.trim())}</span>`).join('')}${(c.fore||'').split(',').filter(x=>x.trim()).map(x=>`<span class="tag tf">▸ ${hi(x.trim())}</span>`).join('')}</div>
+      ${snip}
+    </div>`;
   }).join('');
 }
 
