@@ -480,16 +480,16 @@ function renderSidebar(){
   sFolders.forEach(f=>{
     const fb=sBooks.filter(b=>b.folderId===f.id);
     html+=`<div>
-      <div class="sb-folder-hd${f.collapsed?'':' open'}"
+      <div class="sb-folder-hd${f.collapsed?'':' open'}" onclick="toggleFolder('${f.id}')"
         ondragover="event.preventDefault();this.classList.add('sb-drop-target')"
         ondragleave="this.classList.remove('sb-drop-target')"
         ondrop="sbDropOnFolder(event,'${f.id}',this)">
-        <span draggable="true" ondragstart="sbDragStart(event,'folder','${f.id}')" style="cursor:grab;color:var(--ink-4);font-size:11px;padding:0 2px" title="拖曳排序">⠿</span>
+        <span draggable="true" ondragstart="sbDragStart(event,'folder','${f.id}')" onclick="event.stopPropagation()" style="cursor:grab;color:var(--ink-4);font-size:11px;padding:0 2px" title="拖曳排序">⠿</span>
         <span class="fold-arrow">▶</span>
-        <span class="sb-folder-name" onclick="toggleFolder('${f.id}')">${f.name}</span>
+        <span class="sb-folder-name">${f.name}</span>
         <div class="sb-folder-acts">
-          <button class="sb-folder-act" onclick="renameFolder('${f.id}')">✎</button>
-          <button class="sb-folder-act" onclick="deleteFolder('${f.id}')">✕</button>
+          <button class="sb-folder-act" onclick="event.stopPropagation();renameFolder('${f.id}')">✎</button>
+          <button class="sb-folder-act" onclick="event.stopPropagation();deleteFolder('${f.id}')">✕</button>
         </div>
       </div>
       ${!f.collapsed?`<div class="sb-folder-books">${fb.map(bookBtn).join('')}</div>`:''}
@@ -540,7 +540,11 @@ function sbDropOnBook(e,tid,el){
   const src=books.find(x=>x.id===dragData.id),tgt=books.find(x=>x.id===tid);
   if(!src||!tgt)return;
   src.folderId=tgt.folderId;
-  const tmp=src.order||0;src.order=tgt.order||0;tgt.order=tmp;
+  // 取同资料夹的书，插入到目标位置
+  const siblings=books.filter(b=>b.folderId===(tgt.folderId||null)&&b.id!==src.id).sort((a,b)=>(a.order||0)-(b.order||0));
+  const idx=siblings.findIndex(b=>b.id===tid);
+  siblings.splice(idx,0,src);
+  siblings.forEach((b,i)=>b.order=i);
   lsSet(BK,books);dragData=null;renderSidebar();
 }
 function renderLib(){
