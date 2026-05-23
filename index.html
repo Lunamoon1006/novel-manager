@@ -29,6 +29,18 @@ body{font-family:'Noto Sans SC',sans-serif;background:var(--paper);color:var(--i
 .sb-book .bname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-add{padding:7px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--ink-3);display:flex;align-items:center;gap:8px;border:1px dashed var(--border);background:none;width:100%;text-align:left;transition:all .15s;margin-top:4px}
 .sb-add:hover{border-color:var(--ink-3);color:var(--ink-2);background:var(--paper-3)}
+.sb-folder-hd{display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:6px;font-size:12px;color:var(--ink-3);margin-bottom:1px;user-select:none}
+.sb-folder-hd:hover{background:var(--paper-3);color:var(--ink-2)}
+.sb-folder-hd .fold-arrow{font-size:9px;transition:transform .15s;display:inline-block}
+.sb-folder-hd.open .fold-arrow{transform:rotate(90deg)}
+.sb-folder-name{flex:1;cursor:pointer;font-weight:500}
+.sb-folder-acts{display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.sb-folder-hd:hover .sb-folder-acts{opacity:1}
+.sb-folder-act{background:none;border:none;cursor:pointer;padding:1px 4px;border-radius:3px;font-size:11px;color:var(--ink-3)}
+.sb-folder-act:hover{background:var(--paper-2);color:var(--ink)}
+.sb-folder-books{padding-left:10px;margin-left:6px;border-left:1.5px solid var(--border)}
+.sb-drop-target{outline:2px dashed var(--gold)!important;background:var(--gold-light)!important}
+.sb-book.drop-above{border-top:2px solid var(--red)!important}
 .sb-footer{margin-top:auto;padding-top:1rem}
 .sb-setting{padding:7px 10px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px;border:none;background:none;width:100%;text-align:left;transition:all .15s}
 .sb-setting:hover{background:var(--paper-3);color:var(--ink-2)}
@@ -229,6 +241,7 @@ textarea{resize:vertical}
     <div class="sb-section">书籍</div>
     <div id="sb-books"></div>
     <button class="sb-add" onclick="showModal('book')">＋ 新增书籍</button>
+    <button class="sb-add" onclick="addFolder()" style="margin-top:2px">＋ 新增资料夹</button>
     <div class="sb-footer">
       <button class="sb-setting" onclick="exportData()">📤 汇出数据备份</button>
       <button class="sb-setting" onclick="document.getElementById('import-input').click()">📥 汇入数据</button>
@@ -385,7 +398,7 @@ textarea{resize:vertical}
 </div>
 
 <script>
-const BK='novel_bk_v6',CK=b=>`novel_ch_${b}_v6`,CHK=b=>`novel_char_${b}_v6`,IK=b=>`novel_intro_${b}_v6`;
+const BK='novel_bk_v6',CK=b=>`novel_ch_${b}_v6`,CHK=b=>`novel_char_${b}_v6`,IK=b=>`novel_intro_${b}_v6`,FK='novel_folders_v6';
 const PID='book_peony',API_KEY_STORE='novel_api_key';
 
 const LINES=[
@@ -425,6 +438,7 @@ let books=[],cur=null,spChs=[],apiKey='';
 let curChars=[],curIntros=[];
 let editingCharId=null,editingIntroId=null;
 let ovScrollY=0;
+let folders=[],dragData=null;
 let pendingSaveData=null;
 
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
@@ -434,6 +448,7 @@ function init(){
   apiKey=localStorage.getItem(API_KEY_STORE)||'';
   if(apiKey)document.getElementById('api-overlay').style.display='none';
   books=lsGet(BK)||[];
+  folders=lsGet(FK)||[];
   if(!books.length){
     books=[{id:PID,name:'芍药媚君心',author:'',genre:'古风言情'}];
     lsSet(BK,books);
@@ -446,12 +461,85 @@ function saveApiKey(){const k=document.getElementById('api-key-input').value.tri
 function skipApiKey(){document.getElementById('api-overlay').style.display='none'}
 function showApiSetting(){document.getElementById('api-key-input').value=apiKey;document.getElementById('api-overlay').style.display='flex'}
 
+function bookBtn(b){
+  return`<button class="sb-book ${cur&&cur.id===b.id?'active':''}" onclick="openBook('${b.id}')"
+    draggable="true" ondragstart="sbDragStart(event,'book','${b.id}')"
+    ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drop-above')"
+    ondragleave="this.classList.remove('drop-above')"
+    ondrop="sbDropOnBook(event,'${b.id}',this)">
+    <span style="font-size:14px">${b.id===PID?'🌸':'📖'}</span>
+    <span class="bname">${b.name}</span>
+  </button>`;
+}
 function renderSidebar(){
-  document.getElementById('sb-books').innerHTML=books.map(b=>`
-    <button class="sb-book ${cur&&cur.id===b.id?'active':''}" onclick="openBook('${b.id}')">
-      <span style="font-size:14px">${b.id===PID?'🌸':'📖'}</span>
-      <span class="bname">${b.name}</span>
-    </button>`).join('');
+  const sBooks=[...books].sort((a,b)=>(a.order||0)-(b.order||0));
+  const sFolders=[...folders].sort((a,b)=>(a.order||0)-(b.order||0));
+  let html='';
+  sFolders.forEach(f=>{
+    const fb=sBooks.filter(b=>b.folderId===f.id);
+    html+=`<div>
+      <div class="sb-folder-hd${f.collapsed?'':' open'}"
+        draggable="true" ondragstart="sbDragStart(event,'folder','${f.id}')"
+        ondragover="event.preventDefault();this.classList.add('sb-drop-target')"
+        ondragleave="this.classList.remove('sb-drop-target')"
+        ondrop="sbDropOnFolder(event,'${f.id}',this)">
+        <span class="fold-arrow">▶</span>
+        <span class="sb-folder-name" onclick="toggleFolder('${f.id}')">${f.name}</span>
+        <div class="sb-folder-acts">
+          <button class="sb-folder-act" onclick="renameFolder('${f.id}')">✎</button>
+          <button class="sb-folder-act" onclick="deleteFolder('${f.id}')">✕</button>
+        </div>
+      </div>
+      ${!f.collapsed?`<div class="sb-folder-books">${fb.map(bookBtn).join('')}</div>`:''}
+    </div>`;
+  });
+  sBooks.filter(b=>!b.folderId).forEach(b=>html+=bookBtn(b));
+  document.getElementById('sb-books').innerHTML=html;
+}
+// ── Folder management ──
+function addFolder(){
+  const name=prompt('资料夹名称：');if(!name||!name.trim())return;
+  folders.push({id:'fd'+Date.now(),name:name.trim(),order:folders.length,collapsed:false});
+  lsSet(FK,folders);renderSidebar();
+}
+function toggleFolder(fid){
+  const f=folders.find(x=>x.id===fid);if(!f)return;
+  f.collapsed=!f.collapsed;lsSet(FK,folders);renderSidebar();
+}
+function renameFolder(fid){
+  const f=folders.find(x=>x.id===fid);if(!f)return;
+  const n=prompt('重命名资料夹：',f.name);if(!n||!n.trim())return;
+  f.name=n.trim();lsSet(FK,folders);renderSidebar();
+}
+function deleteFolder(fid){
+  const f=folders.find(x=>x.id===fid);if(!f)return;
+  if(!confirm(`删除资料夹「${f.name}」？书籍将移至未分类`))return;
+  books.forEach(b=>{if(b.folderId===fid)b.folderId=null;});
+  folders=folders.filter(x=>x.id!==fid);
+  lsSet(FK,folders);lsSet(BK,books);renderSidebar();
+}
+// ── Drag & drop ──
+function sbDragStart(e,type,id){dragData={type,id};e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}
+function sbDropOnFolder(e,fid,el){
+  e.preventDefault();el.classList.remove('sb-drop-target');
+  if(!dragData)return;
+  if(dragData.type==='book'){
+    const b=books.find(x=>x.id===dragData.id);
+    if(b){b.folderId=fid;lsSet(BK,books);}
+  }else if(dragData.type==='folder'&&dragData.id!==fid){
+    const fa=folders.find(x=>x.id===dragData.id),fb=folders.find(x=>x.id===fid);
+    if(fa&&fb){const tmp=fa.order;fa.order=fb.order;fb.order=tmp;lsSet(FK,folders);}
+  }
+  dragData=null;renderSidebar();
+}
+function sbDropOnBook(e,tid,el){
+  e.preventDefault();e.stopPropagation();el.classList.remove('drop-above');
+  if(!dragData||dragData.type!=='book'||dragData.id===tid)return;
+  const src=books.find(x=>x.id===dragData.id),tgt=books.find(x=>x.id===tid);
+  if(!src||!tgt)return;
+  src.folderId=tgt.folderId;
+  const tmp=src.order||0;src.order=tgt.order||0;tgt.order=tmp;
+  lsSet(BK,books);dragData=null;renderSidebar();
 }
 function renderLib(){
   let h=books.map(b=>`
@@ -472,7 +560,8 @@ function showModal(mode,data={}){
   const title=document.getElementById('modal-title'),body=document.getElementById('modal-body'),confirm=document.getElementById('modal-confirm');
   if(mode==='book'){
     title.textContent=data.id?'编辑书籍信息':'新增书籍';
-    body.innerHTML=`<label>书名</label><input id="mb-n" placeholder="例：芍药媚君心" value="${data.name||''}"><label>作者笔名</label><input id="mb-a" placeholder="例：昔岁" value="${data.author||''}"><label>类型标签</label><input id="mb-g" placeholder="例：古风言情" value="${data.genre||''}">`;
+    const folderOpts=`<option value="">── 未分类 ──</option>`+folders.map(f=>`<option value="${f.id}"${data.folderId===f.id?' selected':''}>${f.name}</option>`).join('');
+    body.innerHTML=`<label>书名</label><input id="mb-n" placeholder="例：芍药媚君心" value="${data.name||''}"><label>作者笔名</label><input id="mb-a" placeholder="例：昔岁" value="${data.author||''}"><label>类型标签</label><input id="mb-g" placeholder="例：古风言情" value="${data.genre||''}"><label>资料夹</label><select id="mb-f" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;background:var(--paper-2);color:var(--ink)">${folderOpts}</select>`;
     confirm.onclick=data.id?()=>saveEditBook(data.id):addBook;
   }else if(mode==='char'){
     editingCharId=data.id||null;
@@ -505,7 +594,7 @@ function closeModal(){document.getElementById('modal').style.display='none';edit
 
 function addBook(){
   const n=document.getElementById('mb-n').value.trim();if(!n){alert('请填写书名');return}
-  const b={id:'bk'+Date.now(),name:n,author:document.getElementById('mb-a').value.trim(),genre:document.getElementById('mb-g').value.trim()};
+  const b={id:'bk'+Date.now(),name:n,author:document.getElementById('mb-a').value.trim(),genre:document.getElementById('mb-g').value.trim(),folderId:document.getElementById('mb-f').value||null,order:books.length};
   books.push(b);lsSet(BK,books);closeModal();renderSidebar();renderLib();
 }
 function editBookInfo(){
@@ -515,7 +604,7 @@ function editBookInfo(){
 function saveEditBook(bid){
   const n=document.getElementById('mb-n').value.trim();if(!n){alert('请填写书名');return}
   const b=books.find(x=>x.id===bid);if(!b)return;
-  b.name=n;b.author=document.getElementById('mb-a').value.trim();b.genre=document.getElementById('mb-g').value.trim();
+  b.name=n;b.author=document.getElementById('mb-a').value.trim();b.genre=document.getElementById('mb-g').value.trim();b.folderId=document.getElementById('mb-f').value||null;
   lsSet(BK,books);closeModal();
   if(cur&&cur.id===bid){
     cur.name=b.name;cur.author=b.author;cur.genre=b.genre;
