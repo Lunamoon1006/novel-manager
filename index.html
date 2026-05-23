@@ -310,13 +310,17 @@ textarea{resize:vertical}
 
       <div id="bt-split" class="sec">
         <div class="form-card" style="margin-bottom:12px">
-          <p style="font-size:13px;color:var(--ink-2);margin-bottom:1rem;line-height:1.8">上传 .txt / .md 档案，或直接贴入全文，自动识别「第X章」拆分预览，再批量 AI 摘要后一键导入。</p>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <p style="font-size:13px;color:var(--ink-2);margin-bottom:1rem;line-height:1.8">上传本机或 Google 云端档案，或直接贴入全文，自动识别「第X章」拆分预览，再批量 AI 摘要后一键导入。</p>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
             <label style="margin:0;font-size:13px;font-weight:500">贴入全文内容</label>
             <label for="sp-file-input" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--paper-2);font-size:12px;color:var(--ink-2);transition:all .15s" onmouseover="this.style.background='var(--paper-3)'" onmouseout="this.style.background='var(--paper-2)'">
               📂 上传档案
             </label>
             <input type="file" id="sp-file-input" accept=".txt,.md,.docx" multiple style="display:none" onchange="loadSplitFile(this)">
+            <button onclick="openGDrivePicker()" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;border:1px solid #4285f4;background:#fff;font-size:12px;color:#4285f4;transition:all .15s;font-family:inherit" onmouseover="this.style.background='#e8f0fe'" onmouseout="this.style.background='#fff'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M6.28 3h11.44L22 11.5 12 21 2 11.5Z" fill="#4285f4" opacity=".3"/><path d="m2 11.5 4.28-8.5h11.44L22 11.5H2Z" fill="#4285f4" opacity=".5"/><path d="M12 21 2 11.5h20L12 21Z" fill="#4285f4"/></svg>
+              Google 云端硬盘
+            </button>
             <span id="sp-file-name" style="font-size:12px;color:var(--ink-3)"></span>
           </div>
           <textarea id="sp-in" rows="10" placeholder="贴入整部小说或多个章节的全文内容…"></textarea>
@@ -818,6 +822,79 @@ async function impAll(){
   spChs=[];document.getElementById('sp-in').value='';document.getElementById('sp-result').style.display='none';sbt('ov');renderOv();
 }
 function clearSplit(){document.getElementById('sp-in').value='';document.getElementById('sp-result').style.display='none';spChs=[];document.getElementById('sp-file-name').textContent='';document.getElementById('sp-file-input').value=''}
+
+// ── Google Drive Picker ──
+const GD_API_KEY='AIzaSyBd-JQMYw3ymYTMur-ytYG7DqfvhjialOo';
+const GD_CLIENT_ID='449021139416-54h924ri7o1rack21ieoaqiu7adq5sof.apps.googleusercontent.com';
+const GD_SCOPE='https://www.googleapis.com/auth/drive.readonly';
+const gd={gapiReady:false,gisReady:false,tokenClient:null,token:null,loading:false};
+
+function openGDrivePicker(){
+  const nameEl=document.getElementById('sp-file-name');
+  if(gd.loading)return;
+  if(!gd.gapiReady||!gd.gisReady){
+    gd.loading=true;nameEl.textContent='载入 Google Drive 中…';
+    let g=false,i=false;
+    function check(){if(g&&i){gd.loading=false;nameEl.textContent='';openGDrivePicker();}}
+    if(!gd.gapiReady){
+      const s=document.createElement('script');s.src='https://apis.google.com/js/api.js';
+      s.onload=()=>{gapi.load('picker',()=>{gd.gapiReady=true;g=true;check();});};
+      document.head.appendChild(s);
+    }else{g=true;}
+    if(!gd.gisReady){
+      const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';
+      s.onload=()=>{
+        gd.tokenClient=google.accounts.oauth2.initTokenClient({
+          client_id:GD_CLIENT_ID,scope:GD_SCOPE,
+          callback:r=>{if(r.error){alert('Google 授权失败：'+r.error);return;}gd.token=r.access_token;showGDPicker();}
+        });
+        gd.gisReady=true;i=true;check();
+      };
+      document.head.appendChild(s);
+    }else{i=true;}
+    return;
+  }
+  if(!gd.token){gd.tokenClient.requestAccessToken({prompt:''});}
+  else{showGDPicker();}
+}
+
+function showGDPicker(){
+  const view=new google.picker.DocsView()
+    .setMimeTypes('text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.google-apps.document');
+  new google.picker.PickerBuilder()
+    .addView(view)
+    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+    .setOAuthToken(gd.token).setDeveloperKey(GD_API_KEY)
+    .setCallback(gdPickerCb).setTitle('选择小说档案（支援多选）')
+    .build().setVisible(true);
+}
+
+async function gdPickerCb(data){
+  if(data[google.picker.Response.ACTION]!==google.picker.Action.PICKED)return;
+  const docs=data[google.picker.Response.DOCUMENTS];
+  const nameEl=document.getElementById('sp-file-name');
+  const results=[];
+  for(let i=0;i<docs.length;i++){
+    const doc=docs[i];nameEl.textContent=`下载中（${i+1}/${docs.length}）…`;
+    try{
+      const h={Authorization:'Bearer '+gd.token};
+      let text='';
+      if(doc.mimeType==='application/vnd.google-apps.document'){
+        const r=await fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}/export?mimeType=text/plain`,{headers:h});
+        text=await r.text();
+      }else if(doc.mimeType.includes('wordprocessingml')){
+        const r=await fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}?alt=media`,{headers:h});
+        text=(await mammoth.extractRawText({arrayBuffer:await r.arrayBuffer()})).value;
+      }else{
+        const r=await fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}?alt=media`,{headers:h});
+        text=await r.text();
+      }
+      results.push(text);
+    }catch(e){alert(`「${doc.name}」下载失败，已跳过`);}
+  }
+  document.getElementById('sp-in').value=results.join('\n\n');
+  nameEl.textContent=docs.length===1?docs[0].name:`${docs.length} 个档案（${docs.map(d=>d.name).join('、')}）`;
+}
 function loadSplitFile(input){
   const files=[...input.files];if(!files.length)return;
   document.getElementById('sp-file-name').textContent='读取中…';
