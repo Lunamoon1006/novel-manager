@@ -860,11 +860,12 @@ function openGDrivePicker(){
 
 function showGDPicker(){
   const mime='text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.google-apps.document';
-  const recentView=new google.picker.DocsView().setMimeTypes(mime);
-  const driveView=new google.picker.DocsView(google.picker.ViewId.DOCS).setMimeTypes(mime).setIncludeFolders(false);
+  const view=new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setMimeTypes(mime)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(false);
   new google.picker.PickerBuilder()
-    .addView(recentView)
-    .addView(driveView)
+    .addView(view)
     .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
     .setOAuthToken(gd.token).setDeveloperKey(GD_API_KEY)
     .setCallback(gdPickerCb).setTitle('选择小说档案（支援多选）')
