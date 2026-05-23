@@ -736,9 +736,27 @@ function computeDiff(oldStr,newStr){
   if(!a.length&&!b.length)return[];
   // 短文本：精细 token 级 diff
   if(a.length<=800&&b.length<=800)return lcsArr(a,b);
-  // 长文本：段落级 diff，完整显示全文差异
+  // 长文本：先段落级，再对「相邻删除+新增」做字符级精细比对
   const pa=(oldStr||'').split('\n'),pb=(newStr||'').split('\n');
-  return lcsArr(pa,pb).flatMap(item=>[{t:item.t,v:item.v},{t:'same',v:'\n'}]);
+  const coarse=lcsArr(pa,pb);
+  const out=[];
+  for(let i=0;i<coarse.length;i++){
+    const cur=coarse[i],nxt=coarse[i+1];
+    if(cur.t==='del'&&nxt&&nxt.t==='add'){
+      // 相邻 del+add → 做字符级精细 diff
+      const oa=tok(cur.v),nb=tok(nxt.v);
+      if(oa.length<=500&&nb.length<=500){
+        out.push(...lcsArr(oa,nb));
+      }else{
+        out.push({t:'del',v:cur.v},{t:'add',v:nxt.v});
+      }
+      out.push({t:'same',v:'\n'});
+      i++;// 跳过 nxt
+    }else{
+      out.push({t:cur.t,v:cur.v},{t:'same',v:'\n'});
+    }
+  }
+  return out;
 }
 
 function showDiff(num,vIdx){
