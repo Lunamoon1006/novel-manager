@@ -808,7 +808,7 @@ async function aiAllSum(){
   pw.style.display='block';
   for(let i=0;i<spChs.length;i++){
     const c=spChs[i];pt.textContent=`正在分析第 ${c.num} 章（${i+1}/${spChs.length}）`;pf.style.width=Math.round(i/spChs.length*100)+'%';
-    try{const r=await callAI(c.body,cur.id);const p=parseAI(r);c.summary=p.summary||'';c.chars=p.chars||'';c.fore=(p.fore&&p.fore!=='无')?p.fore:'';c.res=(p.res&&p.res!=='无')?p.res:''}catch(e){break}
+    try{const r=await callAI(c.body,cur.id);const p=parseAI(r);c.summary=p.summary||'';c.chars=p.chars||'';c.fore=(p.fore&&p.fore!=='无')?p.fore:'';c.res=(p.res&&p.res!=='无')?p.res:''}catch(e){pt.textContent=`第 ${c.num} 章分析失败：${e.message}`;pf.style.width='0%';btn.disabled=false;setTimeout(()=>pw.style.display='none',4000);renderSpList();return;}
     await new Promise(r=>setTimeout(r,700));
   }
   pf.style.width='100%';pt.textContent='完成！';renderSpList();btn.disabled=false;setTimeout(()=>pw.style.display='none',2000);
@@ -859,10 +859,12 @@ function openGDrivePicker(){
 }
 
 function showGDPicker(){
-  const view=new google.picker.DocsView()
-    .setMimeTypes('text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.google-apps.document');
+  const mime='text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.google-apps.document';
+  const recentView=new google.picker.DocsView().setMimeTypes(mime);
+  const driveView=new google.picker.DocsView(google.picker.ViewId.DOCS).setMimeTypes(mime).setIncludeFolders(false);
   new google.picker.PickerBuilder()
-    .addView(view)
+    .addView(recentView)
+    .addView(driveView)
     .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
     .setOAuthToken(gd.token).setDeveloperKey(GD_API_KEY)
     .setCallback(gdPickerCb).setTitle('选择小说档案（支援多选）')
