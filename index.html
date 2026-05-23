@@ -424,6 +424,7 @@ const PEONY_CHARS=[
 let books=[],cur=null,spChs=[],apiKey='';
 let curChars=[],curIntros=[];
 let editingCharId=null,editingIntroId=null;
+let ovScrollY=0;
 let pendingSaveData=null;
 
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
@@ -547,12 +548,15 @@ function goLib(){cur=null;document.getElementById('view-lib').style.display='blo
 
 function sbt(name){
   const ns=['ov','add','split','search','fore','chars','intro'];
+  const cur_tab=ns[([...document.querySelectorAll('.tab')].findIndex(t=>t.classList.contains('on')))]||'ov';
+  if(cur_tab==='ov'&&name!=='ov')ovScrollY=window.scrollY;
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',ns[i]===name));
   ns.forEach(n=>{const e=document.getElementById('bt-'+n);if(e)e.classList.toggle('on',n===name)});
   if(name==='fore')renderFore();
   if(name==='search')doSearch();
   if(name==='chars')renderChars();
   if(name==='intro')renderIntros();
+  if(name==='ov')requestAnimationFrame(()=>window.scrollTo({top:ovScrollY,behavior:'instant'}));
 }
 
 // ── Overview ──
